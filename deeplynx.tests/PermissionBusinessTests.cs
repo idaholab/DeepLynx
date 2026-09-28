@@ -2,6 +2,8 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -21,9 +23,8 @@ public class PermissionBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private PermissionBusiness _permissionBusiness;
     private Mock<IBulkCopyUpsertExecutor> _mockBulkCopyUpsertExecutor = null!;
-    
-    public long lid; // label IDs
-    public long lid2;
+
+    public long lid; // label ID
 
     public long oid; // organization ID
     public long permid1; // permission IDs
@@ -37,6 +38,7 @@ public class PermissionBusinessTests : IntegrationTestBase
     public long pid; // project ID
     public long uid;
 
+    public long readActionId;
 
     public PermissionBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -84,18 +86,15 @@ public class PermissionBusinessTests : IntegrationTestBase
 
         // create test label (sensitivity label)
         var label = new SensitivityLabel { Name = "Test Label", OrganizationId = oid };
-        var label2 = new SensitivityLabel { Name = "Other Label", OrganizationId = oid };
-        Context.SensitivityLabels.AddRange(label, label2);
+        Context.SensitivityLabels.Add(label);
         await Context.SaveChangesAsync();
         lid = label.Id;
-        lid2 = label2.Id;
 
         // create test permissions
         var permission1 = new Permission
         {
             Name = "Basic Permission",
             Action = "read",
-            LabelId = lid,
             OrganizationId = oid,
             IsDefault = false,
             ProjectId = pid,
@@ -104,7 +103,6 @@ public class PermissionBusinessTests : IntegrationTestBase
         {
             Name = "Archived Permission",
             Action = "write",
-            LabelId = lid,
             OrganizationId = oid,
             IsDefault = false,
             IsArchived = true
@@ -113,7 +111,6 @@ public class PermissionBusinessTests : IntegrationTestBase
         {
             Name = "Permission with Project",
             Action = "execute",
-            LabelId = lid,
             ProjectId = pid,
             OrganizationId = oid,
             IsDefault = false
@@ -122,7 +119,6 @@ public class PermissionBusinessTests : IntegrationTestBase
         {
             Name = "Deleted Permission",
             Action = "delete",
-            LabelId = lid,
             OrganizationId = oid,
             IsDefault = false
         };
@@ -130,15 +126,14 @@ public class PermissionBusinessTests : IntegrationTestBase
         {
             Name = "Permission with Organization",
             Action = "manage",
-            LabelId = lid,
             OrganizationId = oid,
-            IsDefault = false, ProjectId = pid
+            IsDefault = false,
+            ProjectId = pid
         };
         var permission6 = new Permission
         {
             Name = "Second Permission Same Project",
             Action = "sing",
-            LabelId = lid2,
             ProjectId = pid,
             OrganizationId = oid,
             IsDefault = false
@@ -147,7 +142,6 @@ public class PermissionBusinessTests : IntegrationTestBase
         {
             Name = "Second Permission Same Organization",
             Action = "dance",
-            LabelId = lid2,
             OrganizationId = oid,
             IsDefault = false
         };
@@ -174,6 +168,29 @@ public class PermissionBusinessTests : IntegrationTestBase
         // delete permission 4 to test "not found" scenarios
         Context.Permissions.Remove(permission4);
         await Context.SaveChangesAsync();
+
+        readActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "read record")).Id;
+    }
+
+    /// <summary>
+    /// Shared setup: attach permid1 to a role, and put a project member on that role, so
+    /// mutating permid1 has an observable effect on a cached ProjectPermission entry.
+    /// </summary>
+    private async Task<(long roleId, long memberId)> AttachPermissionToRoleWithMemberAsync(long permissionId)
+    {
+        var role = new Role { Name = $"Perm Cache Role {Guid.NewGuid()}", OrganizationId = oid, ProjectId = pid };
+        Context.Roles.Add(role);
+        await Context.SaveChangesAsync();
+
+        var permission = await Context.Permissions.FirstAsync(p => p.Id == permissionId);
+        role.Permissions.Add(permission);
+        await Context.SaveChangesAsync();
+
+        var member = new ProjectMember { ProjectId = pid, UserId = uid, RoleId = role.Id };
+        Context.ProjectMembers.Add(member);
+        await Context.SaveChangesAsync();
+
+        return (role.Id, member.Id);
     }
 
     #region GetAllPermissions Tests
@@ -198,21 +215,15 @@ public class PermissionBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetAllPermissions_FiltersOnLabelId()
     {
-        // Act
+        // Act - label-scoped V1 permissions are deprecated; GetAllPermissions now hardcodes
+        // an empty list whenever labelId is supplied.
         var result = await _permissionBusiness.GetAllPermissions(lid, null, oid);
         var permissions = result.ToList();
 
-        // Assert - should return only permissions with lid and organizationId = oid
-        Assert.Equal(4, permissions.Count);
-        Assert.All(permissions, p => 
-            Assert.True(p.LabelId == lid || p.IsDefault));
-        Assert.All(permissions, p => 
-            Assert.True(p.OrganizationId == oid || p.IsDefault));
-        Assert.Contains(permissions, p => p.Id == permid1);
-        Assert.Contains(permissions, p => p.Id == permid3);
-        Assert.Contains(permissions, p => p.Id == permid5);
+        // Assert
+        Assert.Empty(permissions);
     }
-    
+
 
     [Fact]
     public async Task GetAllPermissions_FiltersOnOrganizationId()
@@ -223,7 +234,7 @@ public class PermissionBusinessTests : IntegrationTestBase
 
         // Assert - should return all non-archived permissions for this organization
         Assert.Equal(6, permissions.Count);
-        Assert.All(permissions, p => 
+        Assert.All(permissions, p =>
             Assert.True(p.OrganizationId == oid || p.IsDefault));
         Assert.Contains(permissions, p => p.Id == permid1);
         Assert.Contains(permissions, p => p.Id == permid3);
@@ -235,21 +246,13 @@ public class PermissionBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetAllPermissions_FiltersOnMultiple()
     {
-        // Act - filter by label and project
+        // Act - filter by label and project; label-scoped V1 permissions are deprecated, so
+        // supplying labelId hardcodes an empty result regardless of the project filter.
         var result = await _permissionBusiness.GetAllPermissions(lid, pid, oid);
         var permissions = result.ToList();
 
-        // Assert - should return permissions matching all criteria
-        Assert.Equal(4, permissions.Count);
-        Assert.All(permissions, p => 
-            Assert.True(p.ProjectId == pid || p.IsDefault));
-        Assert.All(permissions, p => 
-            Assert.True(p.LabelId == lid || p.IsDefault));
-        Assert.All(permissions, p => 
-            Assert.True(p.OrganizationId == oid || p.IsDefault));
-        Assert.Contains(permissions, p => p.Id == permid1);
-        Assert.Contains(permissions, p => p.Id == permid3);
-        Assert.Contains(permissions, p => p.Id == permid5);
+        // Assert
+        Assert.Empty(permissions);
     }
 
     [Fact]
@@ -327,8 +330,7 @@ public class PermissionBusinessTests : IntegrationTestBase
         {
             Name = "New Project Permission",
             Description = "A test permission for projects",
-            Action = "test",
-            LabelId = lid
+            Action = "test"
         };
 
         var now = DateTime.UtcNow;
@@ -345,7 +347,6 @@ public class PermissionBusinessTests : IntegrationTestBase
         Assert.Equal(dto.Description, result.Description);
         Assert.Equal(oid, result.OrganizationId);
         Assert.Equal(pid, result.ProjectId);
-        Assert.Equal(lid, result.LabelId);
         Assert.False(result.IsDefault);
         Assert.True(result.LastUpdatedAt >= now);
         Assert.Equal(uid, result.LastUpdatedBy);
@@ -375,8 +376,7 @@ public class PermissionBusinessTests : IntegrationTestBase
         {
             Name = "New Org Permission",
             Description = "A test permission for organizations",
-            Action = "test",
-            LabelId = lid
+            Action = "test"
         };
 
         var now = DateTime.UtcNow;
@@ -393,7 +393,6 @@ public class PermissionBusinessTests : IntegrationTestBase
         Assert.Equal(dto.Description, result.Description);
         Assert.Equal(oid, result.OrganizationId);
         Assert.Null(result.ProjectId);
-        Assert.Equal(lid, result.LabelId);
         Assert.False(result.IsDefault);
         Assert.True(result.LastUpdatedAt >= now);
         Assert.Equal(uid, result.LastUpdatedBy);
@@ -422,8 +421,7 @@ public class PermissionBusinessTests : IntegrationTestBase
         {
             Name = "Event Permission",
             Description = "A test permission for event logging",
-            Action = "test",
-            LabelId = lid
+            Action = "test"
         };
 
         // Act
@@ -451,8 +449,7 @@ public class PermissionBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CreatePermissionRequestDto
         {
-            Action = "test",
-            LabelId = lid
+            Action = "test"
         };
 
         // Act & Assert
@@ -469,8 +466,7 @@ public class PermissionBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CreatePermissionRequestDto
         {
-            Name = "No Action Permission",
-            LabelId = lid
+            Name = "No Action Permission"
         };
 
         // Act & Assert
@@ -508,7 +504,6 @@ public class PermissionBusinessTests : IntegrationTestBase
         Assert.Equal(dto.Description, result.Description);
         Assert.Equal(dto.Action, result.Action);
         Assert.Equal(oid, result.OrganizationId);
-        Assert.Equal(lid, result.LabelId);
         Assert.False(result.IsDefault);
         Assert.True(result.LastUpdatedAt >= now);
         Assert.Equal(uid, result.LastUpdatedBy);
@@ -659,6 +654,20 @@ public class PermissionBusinessTests : IntegrationTestBase
         Assert.Empty(eventList);
     }
 
+    [Fact]
+    public async Task UpdatePermission_InvalidatesCache_ForMembersOfRolesHoldingPermission()
+    {
+        await AttachPermissionToRoleWithMemberAsync(permid1);
+
+        var staleKey = CacheKeys.ProjectPermission(uid, pid, "read", null);
+        await CacheService.Instance.SetAsync(staleKey, true, (TimeSpan?)null);
+
+        await _permissionBusiness.UpdatePermission(oid, pid, uid, permid1,
+            new UpdatePermissionRequestDto { Action = "write" });
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
+    }
+
     #endregion
 
     #region ArchivePermission Tests
@@ -679,7 +688,7 @@ public class PermissionBusinessTests : IntegrationTestBase
         var savedPermission = await Context.Permissions.FindAsync(permid5);
         Assert.NotNull(savedPermission);
         Assert.True(savedPermission.IsArchived);
-        
+
     }
 
     [Fact]
@@ -712,6 +721,19 @@ public class PermissionBusinessTests : IntegrationTestBase
         Assert.Empty(eventList);
     }
 
+    [Fact]
+    public async Task ArchivePermission_InvalidatesCache_ForMembersOfRolesHoldingPermission()
+    {
+        await AttachPermissionToRoleWithMemberAsync(permid1);
+
+        var staleKey = CacheKeys.ProjectPermission(uid, pid, "read", null);
+        await CacheService.Instance.SetAsync(staleKey, true, (TimeSpan?)null);
+
+        await _permissionBusiness.ArchivePermission(oid, pid, uid, permid1);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
+    }
+
     #endregion
 
     #region UnarchivePermission Tests
@@ -741,7 +763,6 @@ public class PermissionBusinessTests : IntegrationTestBase
         Assert.Null(savedPermission.Resource);
         Assert.Equal(oid, savedPermission.OrganizationId);
         Assert.Null(savedPermission.ProjectId);
-        Assert.Equal(lid, savedPermission.LabelId);
         Assert.False(savedPermission.IsDefault);
         Assert.True(savedPermission.LastUpdatedAt >= now);
         Assert.Equal(uid, savedPermission.LastUpdatedBy);
@@ -785,6 +806,20 @@ public class PermissionBusinessTests : IntegrationTestBase
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
+    }
+
+    [Fact]
+    public async Task UnarchivePermission_InvalidatesCache_ForMembersOfRolesHoldingPermission()
+    {
+        await AttachPermissionToRoleWithMemberAsync(permid1);
+        await _permissionBusiness.ArchivePermission(oid, pid, uid, permid1);
+
+        var staleKey = CacheKeys.ProjectPermission(uid, pid, "read", null);
+        await CacheService.Instance.SetAsync(staleKey, false, (TimeSpan?)null);
+
+        await _permissionBusiness.UnarchivePermission(oid, pid, uid, permid1);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
     }
 
     #endregion
@@ -845,48 +880,42 @@ public class PermissionBusinessTests : IntegrationTestBase
         Assert.Empty(eventList);
     }
 
+    [Fact]
+    public async Task DeletePermission_InvalidatesCache_ForMembersWhoHeldPermissionBeforeDelete()
+    {
+        await AttachPermissionToRoleWithMemberAsync(permid6); // permid6 is deletable (not IsDefault)
+
+        var staleKey = CacheKeys.ProjectPermission(uid, pid, "sing", null);
+        await CacheService.Instance.SetAsync(staleKey, true, (TimeSpan?)null);
+
+        await _permissionBusiness.DeletePermission(oid, pid, uid, permid6);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
+    }
+
     #endregion
-    
+
     #region UniqueConstraintTests
 
     [Fact]
-    public async Task AddPermission_Fails_WhenDuplicateLabelActionInProject()
+    public async Task AddSensitivityLabelGrant_Fails_WhenDuplicateUserLabelAction()
     {
-        var permission9 = new Permission
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            Name = "Duplicate Permission with Project",
-            Action = "write",
+            UserId = uid,
             LabelId = lid,
-            ProjectId = pid,
-            OrganizationId = oid,
-            IsDefault = true
-        };
-        Context.Permissions.Add(permission9);
-        await Assert.ThrowsAsync<DbUpdateException>(() => Context.SaveChangesAsync());
-    }
+            LabelPermissionId = readActionId,
+            GrantedBy = uid
+        });
+        await Context.SaveChangesAsync();
 
-    [Fact]
-    public async Task AddPermission_Fails_WhenDuplicateLabelActionInOrganization()
-    {
-        var permission1 = new Permission
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            Name = "Default Permission 1",
-            Action = "read",
+            UserId = uid,
             LabelId = lid,
-            OrganizationId = oid,
-            IsDefault = true
-        };
-
-        var permission2 = new Permission
-        {
-            Name = "Default Permission 2",
-            Action = "read",
-            LabelId = lid,
-            OrganizationId = oid,
-            IsDefault = true
-        };
-        Context.Permissions.Add(permission1);
-        Context.Permissions.Add(permission2);
+            LabelPermissionId = readActionId,
+            GrantedBy = uid
+        });
         await Assert.ThrowsAsync<DbUpdateException>(() => Context.SaveChangesAsync());
     }
 
@@ -943,7 +972,7 @@ public class PermissionBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region Scope Level Tests (Default, Organization, Project)
 
     [Fact]
@@ -954,7 +983,6 @@ public class PermissionBusinessTests : IntegrationTestBase
         {
             Name = "Default Permission 1",
             Action = "read",
-            LabelId = null,
             OrganizationId = null,
             ProjectId = null,
             IsDefault = false
@@ -963,7 +991,6 @@ public class PermissionBusinessTests : IntegrationTestBase
         {
             Name = "Default Permission 2",
             Action = "write",
-            LabelId = null,
             OrganizationId = null,
             ProjectId = null,
             IsDefault = false
@@ -992,49 +1019,57 @@ public class PermissionBusinessTests : IntegrationTestBase
 
         // Assert - should return only org-level permissions (has org, no project)
         Assert.True(permissions.Count >= 1); // At least permid7 is org-level only
-        Assert.All(permissions, p => 
+        Assert.All(permissions, p =>
             Assert.True(p.OrganizationId == oid || p.IsDefault));
-        
+
         // Check that org-level permissions are included
         Assert.Contains(permissions, p => p.Id == permid7); // "Second Permission Same Organization" - org only, no project
     }
 
     [Fact]
-    public async Task GetAllPermissions_ReturnsOnlyProjectLevel_WhenBothOrgAndProjectSupplied()
+    public async Task GetAllPermissions_ReturnsProjectLevelAndOrgLevel_WhenBothOrgAndProjectSupplied()
     {
-        // Act - Get project-level permissions
+        // Act - Get project-level and org-level permissions
         var result = await _permissionBusiness.GetAllPermissions(null, pid, oid);
         var permissions = result.ToList();
 
-        // Assert - should return only project-level permissions
-        Assert.True(permissions.Count >= 4); // Several project-level permissions exist
-        Assert.All(permissions, p => 
-            Assert.True(p.ProjectId == pid || p.IsDefault));
-        Assert.All(permissions, p => 
+        // Assert - should return at least project-level and org-level permissions
+        Assert.True(permissions.Count >= 4); // Several permissions exist
+
+        // All permissions must belong either to the requested project or have ProjectId == null (org-level) or be default
+        Assert.All(permissions, p =>
+            Assert.True(p.ProjectId == pid || p.ProjectId == null || p.IsDefault));
+
+        // All permissions must belong to the organization or be default
+        Assert.All(permissions, p =>
             Assert.True(p.OrganizationId == oid || p.IsDefault));
-        
-        // Check that project-level permissions are included
+
+        // Check specific permissions exist
         Assert.Contains(permissions, p => p.Id == permid1); // "Basic Permission"
         Assert.Contains(permissions, p => p.Id == permid3); // "Permission with Project"
         Assert.Contains(permissions, p => p.Id == permid5); // "Permission with Organization"
         Assert.Contains(permissions, p => p.Id == permid6); // "Second Permission Same Project"
-        
-        // Should NOT include org-level only permissions
-        Assert.DoesNotContain(permissions, p => p.Id == permid7); // org-level only (no project)
+
+        // Now explicitly check org-level only permission is included
+        Assert.Contains(permissions, p => p.Id == permid7); // org-level only (no project)
     }
 
+
+
     [Fact]
-    public async Task GetAllPermissions_ScopeIsolation_OrgDoNotMixWithProject()
+    public async Task GetAllPermissions_ScopeIsolation_IncludesOrgLevelWithProject()
     {
         // Arrange - permid7 is org-level only (no project)
-        
-        // Act - Get project permissions
+
+        // Act - Get permissions for given project and org
         var permissions = await _permissionBusiness.GetAllPermissions(null, pid, oid);
-        
-        // Assert - org-level permission should NOT appear in project results
-        Assert.DoesNotContain(permissions, p => p.Id == permid7);
-        Assert.All(permissions, p => 
-            Assert.True(p.ProjectId == pid || p.IsDefault));
+
+        // Assert - org-level permission SHOULD appear in project results now
+        Assert.Contains(permissions, p => p.Id == permid7);
+
+        // All permissions must have ProjectId == pid OR ProjectId == null OR be default
+        Assert.All(permissions, p =>
+            Assert.True(p.ProjectId == pid || p.ProjectId == null || p.IsDefault));
     }
 
     [Fact]
@@ -1105,10 +1140,10 @@ public class PermissionBusinessTests : IntegrationTestBase
         Assert.NotNull(resultWithProject);
         Assert.NotNull(resultWithOrg);
         Assert.NotNull(resultWithNeither);
-        Assert.All(new[] { resultWithProject, resultWithOrg, resultWithNeither }, 
+        Assert.All(new[] { resultWithProject, resultWithOrg, resultWithNeither },
             r => Assert.True(r.IsDefault));
     }
-    
+
 
     [Fact]
     public async Task UpdatePermission_CannotUpdateDefaultPermission()
@@ -1131,7 +1166,7 @@ public class PermissionBusinessTests : IntegrationTestBase
         Assert.NotNull(unchangedPermission);
         Assert.Equal("Default Permission with Project", unchangedPermission.Name); // Original name
     }
-    
+
 
     [Fact]
     public async Task DeletePermission_CannotDeleteDefaultPermission()
@@ -1146,7 +1181,7 @@ public class PermissionBusinessTests : IntegrationTestBase
         var unchangedPermission = await Context.Permissions.FindAsync(permid8);
         Assert.NotNull(unchangedPermission);
     }
-    
+
 
     [Fact]
     public async Task ArchivePermission_CannotArchiveDefaultPermission()
@@ -1226,8 +1261,7 @@ public class PermissionBusinessTests : IntegrationTestBase
         var projectScopeDto = new CreatePermissionRequestDto
         {
             Name = "Project Scope Permission",
-            Action = "test",
-            LabelId = lid
+            Action = "test"
         };
 
         // Act

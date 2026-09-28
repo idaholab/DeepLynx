@@ -22,17 +22,22 @@ public class GraphBusinessTests : IntegrationTestBase
     private GraphBusiness _graphBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<ProjectBusiness>> _mockLogger = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
+    private Mock<IFileBusinessFactory> _mockFileBusinessFactory = null!;
     private Mock<IObjectStorageBusiness> _mockObjectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _mockOrganizationBusiness = null!;
     private Mock<IRecordBusiness> _mockRecordBusiness = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
     private Mock<IRoleBusiness> _mockRoleBusiness = null!;
     private INotificationBusiness _notificationBusiness = null!;
-    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private ProjectBusiness _projectBusiness = null!;
     private IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
+    private EncryptionHelper _encryptionHelper = null!;
+    private ObjectStorageBusiness _objectStorageBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness = null!;
 
     public long classId;
     public long dsid;
@@ -57,9 +62,12 @@ public class GraphBusinessTests : IntegrationTestBase
         _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
         _mockLogger = new Mock<ILogger<ProjectBusiness>>();
         _mockObjectStorageBusiness = new Mock<IObjectStorageBusiness>();
+        _mockAdminService = new Mock<IAdminService>();
         _mockRoleBusiness = new Mock<IRoleBusiness>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
@@ -69,19 +77,21 @@ public class GraphBusinessTests : IntegrationTestBase
         _sensitivityLabelService = new SensitivityLabelService(Context);
 
         _graphBusiness = new GraphBusiness(Context, _eventBusiness, _sensitivityLabelService);
-        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _bulkCopyUpsertExecutor, _sensitivityLabelService);
+        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _bulkCopyUpsertExecutor, _sensitivityLabelService, _mockPermissionService.Object);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness, _mockRecordBusiness.Object,
-            _eventBusiness);
+            _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
-            _mockRelationshipBusiness.Object, _eventBusiness);
-        _notificationBusiness =
-            new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
+            _mockRelationshipBusiness.Object, _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
+
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
+
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object, _classBusiness,
             _mockRoleBusiness.Object, _dataSourceBusiness,
-            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object);
+            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -1165,6 +1175,7 @@ public class GraphBusinessTests : IntegrationTestBase
         Context.SensitivityLabels.Add(label);
         await Context.SaveChangesAsync();
 
+        // No SensitivityLabelGrant for uid1, so the label is ungranted and access is denied by default.
         var rootRecord = await Context.Records
             .Include(r => r.Labels)
             .FirstAsync(r => r.Id == record1Id);

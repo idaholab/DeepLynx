@@ -50,6 +50,8 @@ public class QueryBusinessTests : IntegrationTestBase
     private long rid; // record ID
     public long roleId;
     private long uid;
+    private long readActionId;
+    private long downloadActionId;
 
     public QueryBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -72,7 +74,7 @@ public class QueryBusinessTests : IntegrationTestBase
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _encryptionHelper = new EncryptionHelper();
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
@@ -89,6 +91,8 @@ public class QueryBusinessTests : IntegrationTestBase
             _provenanceBusiness.Object,
             _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
         _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService);
+        readActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "read record")).Id;
+        downloadActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "download file")).Id;
     }
 
     protected override async Task SeedTestDataAsync()
@@ -623,7 +627,7 @@ public class QueryBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
     }
 
-    #region GetMultiProjectRecords Tests
+    #region GetMultiProjectRecords (V1/Legacy) Tests
 
     [Fact]
     public async Task GetMultiProjectRecords_Success_ReturnsRecordsFromMultipleProjects()
@@ -675,6 +679,121 @@ public class QueryBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetMultiProjectRecordsPaginated Tests
+
+    [Fact]
+    public async Task GetMultiProjectRecordsPaginated_ReturnsRecordsFromMultipleProjects_WithPagination()
+    {
+        // Arrange
+        var projectIds = new[] { pid, pid2 };
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecordsPaginated(
+            uid, organizationId, projectIds, hideArchived: true, paginatedRequest);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotEmpty(result.Items);
+        Assert.Contains(result.Items, r => r.ProjectId == pid);
+        Assert.Contains(result.Items, r => r.ProjectId == pid2);
+        Assert.All(result.Items, r => Assert.False(r.IsArchived));
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(10, result.PageSize);
+        Assert.True(result.TotalCount >= result.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetMultiProjectRecordsPaginated_ReturnsOnlyUnarchivedRecords_WithPagination()
+    {
+        // Arrange
+        var projectIds = new[] { pid, pid2 };
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecordsPaginated(
+            uid, organizationId, projectIds, hideArchived: true, paginatedRequest);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotEmpty(result.Items);
+        Assert.All(result.Items, r => Assert.False(r.IsArchived));
+    }
+
+    [Fact]
+    public async Task GetMultiProjectRecordsPaginated_ReturnsWithArchivedRecords_WhenNotFiltered()
+    {
+        // Arrange
+        var projectIds = new[] { pid, pid2 };
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 20 };
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecordsPaginated(
+            uid, organizationId, projectIds, hideArchived: false, paginatedRequest);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotEmpty(result.Items);
+        Assert.Contains(result.Items, r => r.Name == "Echo");
+        Assert.Contains(result.Items, r => r.Name == "Chewbacca");
+    }
+
+    [Fact]
+    public async Task GetMultiProjectRecordsPaginated_ReturnsEmpty_WhenNoProjects()
+    {
+        // Arrange
+        var projectIds = Array.Empty<long>();
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecordsPaginated(
+            uid, organizationId, projectIds, hideArchived: true, paginatedRequest);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetMultiProjectRecordsPaginated_RespectsPagination()
+    {
+        // Arrange
+        var projectIds = new[] { pid, pid2 };
+
+        for (int i = 0; i < 25; i++)
+        {
+            Context.Records.Add(new Record
+            {
+                ProjectId = pid,
+                OrganizationId = organizationId,
+                Name = $"TestRecord_{i}",
+                OriginalId = $"TestRecord_{i}",
+                Description = "test",
+                DataSourceId = did,
+                IsArchived = false,
+                Properties = JsonSerializer.Serialize(new { Armor = "Beskar", Title = "Mand'alor" }),
+            });
+        }
+        await Context.SaveChangesAsync();
+
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 2, PageSize = 10 };
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecordsPaginated(
+            uid, organizationId, projectIds, hideArchived: true, paginatedRequest);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.PageNumber);
+        Assert.Equal(10, result.PageSize);
+        Assert.True(result.TotalCount >= 25);
+        Assert.Equal(10, result.Items.Count);
+    }
+
+
+    #endregion
+
     #region GetMultiProjectRecords_SensitivityLabel_Authorization Tests
 
     [Fact]
@@ -690,23 +809,6 @@ public class QueryBusinessTests : IntegrationTestBase
             Description = "Top Secret Label"
         };
         var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
-
-        Context.ChangeTracker.Clear();
-
-        // Give user write permission to attach the label
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null)
-        {
-            role.Permissions.Add(writePermission);
-            await Context.SaveChangesAsync();
-        }
 
         Context.ChangeTracker.Clear();
 
@@ -742,25 +844,16 @@ public class QueryBusinessTests : IntegrationTestBase
 
         Context.ChangeTracker.Clear();
 
-        // Give user write permission to attach the label
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var readPermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null && readPermission != null)
+        // Grant the user access to the label (access is now per-user, not per-role)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission);
-            role.Permissions.Add(readPermission);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
 
@@ -801,29 +894,15 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user read and write permission to attach and retrieve label
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var writePermission2 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
-
-        var readPermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null && writePermission2 != null && readPermission != null)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission);
-            role.Permissions.Add(writePermission2);
-            role.Permissions.Add(readPermission);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
 
@@ -865,35 +944,23 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user read and write permission to attach and retrieve label
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var writePermission2 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
-
-        var readPermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-
-        var readPermission2 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null && writePermission2 != null
-            && readPermission != null && readPermission2 != null)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission);
-            role.Permissions.Add(writePermission2);
-            role.Permissions.Add(readPermission);
-            role.Permissions.Add(readPermission2);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+        {
+            UserId = uid,
+            LabelId = label2.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
 
@@ -916,7 +983,7 @@ public class QueryBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region Search Tests
+    #region Search (V1 / Legacy) Tests
 
     [Fact]
     public async Task Search_Success_FindsRecordByFullName()
@@ -1248,6 +1315,402 @@ public class QueryBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region SearchPaginated Tests
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByFullName()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Captain Rex", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Captain Rex", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByPartialName()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "capt", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Captain Rex", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByOriginalId()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "CT-9901", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByPartialDescription()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Omega", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Hunter", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByStringInProperties()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Sith", organizationId, [pid3], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Darth Vader", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsWithSpecialCharacters()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "CT-", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(5, result.Items.Count);
+        Assert.Equal(5, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_ReturnsEmptyForNonExistentTerm()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Wookiee", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_RestrictsResultsToSpecifiedProject()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "the", organizationId, [pid2], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.All(result.Items, r => Assert.Equal(pid2, r.ProjectId));
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByPartialTagName()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Padme", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(4, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByPartialTagNameCaseInsensitive()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "padme", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(4, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByTagAcrossMultipleProjects()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Bounty", organizationId, pids, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(2, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsMultipleRecordsByJsonProperties()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "99", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(4, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByPartialOriginalId()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "CT-99", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(4, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByNumericPartialId()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "99", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(4, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByPartialDataSourceName()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Yav", organizationId, pids, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(4, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByPartialProjectName()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Rebel", organizationId, [pid2], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(4, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByShortPartialMatch()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Bo", organizationId, [pid4], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(3, result.Items.Count);
+        Assert.Equal(3, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByCaseInsensitivePartialMatch()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "CAPT", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Captain Rex", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByMultipleWordPartialMatch()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "grand adm", organizationId, [pid3], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Grand Admiral Thrawn", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByMiddleOfWordPartialMatch()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "eck", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Wrecker", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByUriPartialMatch()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "8090", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(5, result.Items.Count);
+        Assert.Equal(5, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByBeginningOfWordPartialMatch()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Wre", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Wrecker", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsAcrossAllAccessibleProjects()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Captain", organizationId, pids, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(2, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordUsingCrossProjectResources()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Death Star", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Tech", result.Items.First().Name);
+        Assert.Equal(pid, result.Items.First().ProjectId);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsArchivedRecordByName()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Echo", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 }, false);
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Echo", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Failure_IfEmptyString()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
+            _queryBusiness.SearchPaginated(
+                uid, "", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 }));
+
+        Assert.Contains("Search query is required", exception.Message);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Failure_IfNull()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
+            _queryBusiness.SearchPaginated(
+                uid, null!, organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 }));
+
+        Assert.Contains("Search query is required", exception.Message);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Failure_IfWhitespaceOnly()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
+            _queryBusiness.SearchPaginated(
+                uid, "     ", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 }));
+
+        Assert.Contains("Search query is required", exception.Message);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_ReturnsEmpty_IfRecordArchived()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Chewbacca", organizationId, [pid2], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 }, true);
+
+        // Assert
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Paginates_Correctly()
+    {
+        // Act - two-page split, page size 2, over the 4 records matching "Padme" tag
+        var page1 = await _queryBusiness.SearchPaginated(
+            uid, "Padme", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = 2 });
+        var page2 = await _queryBusiness.SearchPaginated(
+            uid, "Padme", organizationId, [pid], new PaginatedRequestDto { PageNumber = 2, PageSize = 2 });
+
+        // Assert
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Equal(2, page2.Items.Count);
+        Assert.Equal(4, page1.TotalCount);
+        Assert.Equal(4, page2.TotalCount);
+
+        var page1Ids = page1.Items.Select(r => r.Id).ToHashSet();
+        var page2Ids = page2.Items.Select(r => r.Id).ToHashSet();
+        Assert.Empty(page1Ids.Intersect(page2Ids));
+    }
+
+    [Fact]
+    public async Task SearchPaginated_NoMatches_ReturnsEmptyPaginatedResponse()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Wookiee", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = 25 });
+
+        // Assert
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(25, result.PageSize);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_PageSizeNegativeOne_ReturnsAll_IgnoringPageNumber()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Padme", organizationId, [pid], new PaginatedRequestDto { PageNumber = 5, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.Items.Count, result.PageSize);
+    }
+
+    #endregion
+
     #region Search_SensitivityLabelsAuthorization Tests
 
     [Fact]
@@ -1264,19 +1727,6 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user write permission to attach the label
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null)
-        {
-            role.Permissions.Add(writePermission);
-            await Context.SaveChangesAsync();
-        }
 
         Context.ChangeTracker.Clear();
 
@@ -1307,24 +1757,15 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user write permission to attach the label
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var readPermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null && readPermission != null)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission);
-            role.Permissions.Add(readPermission);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
 
@@ -1361,29 +1802,15 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user read and write permission to attach and retrieve label
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var writePermission2 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
-
-        var readPermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null && writePermission2 != null && readPermission != null)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission);
-            role.Permissions.Add(writePermission2);
-            role.Permissions.Add(readPermission);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
 
@@ -1420,35 +1847,23 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user read and write permission to attach and retrieve label
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var writePermission2 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
-
-        var readPermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-
-        var readPermission2 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null && writePermission2 != null
-            && readPermission != null && readPermission2 != null)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission);
-            role.Permissions.Add(writePermission2);
-            role.Permissions.Add(readPermission);
-            role.Permissions.Add(readPermission2);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+        {
+            UserId = uid,
+            LabelId = label2.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
 
@@ -2310,19 +2725,6 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user write permission to attach the label
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null)
-        {
-            role.Permissions.Add(writePermission);
-            await Context.SaveChangesAsync();
-        }
 
         Context.ChangeTracker.Clear();
 
@@ -2376,24 +2778,15 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user read and write permission to attach and retrieve label
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var readPermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null && readPermission != null)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission);
-            role.Permissions.Add(readPermission);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
 
@@ -2452,29 +2845,15 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user read and write permission to attach and retrieve label
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var writePermission2 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
-
-        var readPermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null && writePermission2 != null && readPermission != null)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission);
-            role.Permissions.Add(writePermission2);
-            role.Permissions.Add(readPermission);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
 
@@ -2533,44 +2912,24 @@ public class QueryBusinessTests : IntegrationTestBase
         var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
         Context.ChangeTracker.Clear();
 
-        // Give user read and write permission to attach and retrieve label
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var writePermission2 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
-
-        var readPermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-
-        var readPermission2 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read record");
-
-        if (writePermission != null && writePermission2 != null && readPermission != null && readPermission2 != null)
+        // Grant the user access to both labels (access is now per-user, not per-role)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            var role = await Context.Roles
-                .Include(r => r.Permissions)
-                .FirstOrDefaultAsync(r => r.Id == roleId);
-
-            if (role != null)
-            {
-                // Attach the permissions first
-                Context.Attach(writePermission);
-                Context.Attach(writePermission2);
-                Context.Attach(readPermission);
-                Context.Attach(readPermission2);
-
-                role.Permissions.Add(writePermission);
-                role.Permissions.Add(writePermission2);
-                role.Permissions.Add(readPermission);
-                role.Permissions.Add(readPermission2);
-                await Context.SaveChangesAsync();
-            }
-        }
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+        {
+            UserId = uid,
+            LabelId = label2.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
 
@@ -2893,37 +3252,8 @@ public class QueryBusinessTests : IntegrationTestBase
 
         Context.ChangeTracker.Clear();
 
-        // Give user write permission to attach the label
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null)
-        {
-            role.Permissions.Add(writePermission);
-            await Context.SaveChangesAsync();
-        }
-
-        Context.ChangeTracker.Clear();
-
-        // Attach label to Captain Rex
+        // Attach label to Captain Rex (user is not granted access to label)
         await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
-
-        Context.ChangeTracker.Clear();
-
-        if (role != null && writePermission != null)
-        {
-            var permissionToRemove = role.Permissions.FirstOrDefault(p => p.Id == writePermission.Id);
-            if (permissionToRemove != null)
-            {
-                role.Permissions.Remove(permissionToRemove);
-                await Context.SaveChangesAsync();
-            }
-        }
 
         Context.ChangeTracker.Clear();
 
@@ -2957,24 +3287,15 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user write permission to attach the label
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var readPermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null && readPermission != null)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission);
-            role.Permissions.Add(readPermission);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
 
@@ -3051,24 +3372,15 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user write permission for label1
-        var writePermission1 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
-
-        var readPermission1 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission1 != null && readPermission1 != null)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission1);
-            role.Permissions.Add(readPermission1);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label1.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
 
@@ -3077,25 +3389,16 @@ public class QueryBusinessTests : IntegrationTestBase
 
         Context.ChangeTracker.Clear();
 
-        // Give user write permission for label2
-        var writePermission2 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
-
-        var readPermission2 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read record");
-
-        role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission2 != null && readPermission2 != null)
+        // Grant the user access to label2
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission2);
-            role.Permissions.Add(readPermission2);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label2.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
 
@@ -3149,19 +3452,6 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user write permission for label1
-        var writePermission1 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission1 != null)
-        {
-            role.Permissions.Add(writePermission1);
-            await Context.SaveChangesAsync();
-        }
 
         Context.ChangeTracker.Clear();
 
@@ -3170,42 +3460,8 @@ public class QueryBusinessTests : IntegrationTestBase
 
         Context.ChangeTracker.Clear();
 
-        // Give user write permission for label2 (temporarily to attach it)
-        var writePermission2 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
-
-        role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission2 != null)
-        {
-            role.Permissions.Add(writePermission2);
-            await Context.SaveChangesAsync();
-        }
-
-        Context.ChangeTracker.Clear();
-
-        // Attach label2 to Captain Rex
+        // Attach label2 to Captain Rex (user is not granted access to label2)
         await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label2.Id);
-
-        Context.ChangeTracker.Clear();
-
-        // Remove write permission for label2 (user only has access to label1)
-        role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission2 != null)
-        {
-            var permissionToRemove = role.Permissions.FirstOrDefault(p => p.Id == writePermission2.Id);
-            if (permissionToRemove != null)
-            {
-                role.Permissions.Remove(permissionToRemove);
-                await Context.SaveChangesAsync();
-            }
-        }
 
         Context.ChangeTracker.Clear();
 
@@ -3260,24 +3516,15 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user write permission for accessible label
-        var writePermission1 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write record");
-
-        var readPermission1 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "read record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission1 != null && readPermission1 != null)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission1);
-            role.Permissions.Add(readPermission1);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = accessibleLabel.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
 
@@ -3286,45 +3533,11 @@ public class QueryBusinessTests : IntegrationTestBase
 
         Context.ChangeTracker.Clear();
 
-        // Give user write permission for restricted label (temporarily to attach)
-        var writePermission2 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write record");
-
-        role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission2 != null)
-        {
-            role.Permissions.Add(writePermission2);
-            await Context.SaveChangesAsync();
-        }
-
-        Context.ChangeTracker.Clear();
-
-        // Get Hunter's record ID and attach restricted label
+        // Get Hunter's record ID and attach restricted label (user is not granted access to restrictedLabel)
         var hunterRecord = await Context.Records
             .FirstOrDefaultAsync(r => r.Name == "Hunter" && r.ProjectId == pid);
 
         await _recordBusiness.AttachLabel(uid, organizationId, pid, hunterRecord.Id, restrictedLabel.Id);
-
-        Context.ChangeTracker.Clear();
-
-        // Remove write permission for restricted label
-        role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission2 != null)
-        {
-            var permissionToRemove = role.Permissions.FirstOrDefault(p => p.Id == writePermission2.Id);
-            if (permissionToRemove != null)
-            {
-                role.Permissions.Remove(permissionToRemove);
-                await Context.SaveChangesAsync();
-            }
-        }
 
         Context.ChangeTracker.Clear();
 
@@ -3541,19 +3754,6 @@ public class QueryBusinessTests : IntegrationTestBase
         var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
         Context.ChangeTracker.Clear();
 
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null)
-        {
-            role.Permissions.Add(writePermission);
-            await Context.SaveChangesAsync();
-        }
 
         Context.ChangeTracker.Clear();
 
@@ -3581,24 +3781,15 @@ public class QueryBusinessTests : IntegrationTestBase
         var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
         Context.ChangeTracker.Clear();
 
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var readPermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null && readPermission != null)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission);
-            role.Permissions.Add(readPermission);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
 
@@ -3624,24 +3815,16 @@ public class QueryBusinessTests : IntegrationTestBase
             new CreateSensitivityLabelRequestDto { Name = "Label B", Description = "B" }, pid, organizationId);
         Context.ChangeTracker.Clear();
 
-        var writePermission = await Context.Permissions.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-        var writePermission2 = await Context.Permissions.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
-        var readPermission = await Context.Permissions.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-        // Intentionally omit readPermission2
-
-        var role = await Context.Roles.Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null && writePermission2 != null && readPermission != null)
+        // Grant the user access to label only (intentionally omit label2)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission);
-            role.Permissions.Add(writePermission2);
-            role.Permissions.Add(readPermission);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
 
@@ -3668,27 +3851,23 @@ public class QueryBusinessTests : IntegrationTestBase
             new CreateSensitivityLabelRequestDto { Name = "Label B", Description = "B" }, pid, organizationId);
         Context.ChangeTracker.Clear();
 
-        var writePermission = await Context.Permissions.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-        var writePermission2 = await Context.Permissions.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
-        var readPermission = await Context.Permissions.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-        var readPermission2 = await Context.Permissions.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read record");
-
-        var role = await Context.Roles.Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null && writePermission2 != null
-            && readPermission != null && readPermission2 != null)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission);
-            role.Permissions.Add(writePermission2);
-            role.Permissions.Add(readPermission);
-            role.Permissions.Add(readPermission2);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+        {
+            UserId = uid,
+            LabelId = label2.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
 
@@ -3717,17 +3896,7 @@ public class QueryBusinessTests : IntegrationTestBase
             new CreateSensitivityLabelRequestDto { Name = "Restricted", Description = "Restricted" }, pid, organizationId);
         Context.ChangeTracker.Clear();
 
-        var writePermission = await Context.Permissions.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
-        var role = await Context.Roles.Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null)
-        {
-            role.Permissions.Add(writePermission);
-            await Context.SaveChangesAsync();
-        }
 
         Context.ChangeTracker.Clear();
         await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
@@ -3750,17 +3919,7 @@ public class QueryBusinessTests : IntegrationTestBase
             new CreateSensitivityLabelRequestDto { Name = "Restricted", Description = "Restricted" }, pid, organizationId);
         Context.ChangeTracker.Clear();
 
-        var writePermission = await Context.Permissions.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
-        var role = await Context.Roles.Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null)
-        {
-            role.Permissions.Add(writePermission);
-            await Context.SaveChangesAsync();
-        }
 
         Context.ChangeTracker.Clear();
         await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
@@ -3783,17 +3942,7 @@ public class QueryBusinessTests : IntegrationTestBase
             new CreateSensitivityLabelRequestDto { Name = "Restricted", Description = "Restricted" }, pid, organizationId);
         Context.ChangeTracker.Clear();
 
-        var writePermission = await Context.Permissions.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
-        var role = await Context.Roles.Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null)
-        {
-            role.Permissions.Add(writePermission);
-            await Context.SaveChangesAsync();
-        }
 
         Context.ChangeTracker.Clear();
         await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
@@ -3935,21 +4084,17 @@ public class QueryBusinessTests : IntegrationTestBase
         var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
         Context.ChangeTracker.Clear();
 
-        // Grant only write (to attach) and read — but NOT download file
-        var writePermission = await Context.Permissions.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-        var readPermission = await Context.Permissions.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-
-        var role = await Context.Roles.Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null && readPermission != null)
+        // Grant read access only (no "download file" grant), so the record is visible but
+        // its URI is hidden under the new grant model, which is per-action.
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission);
-            role.Permissions.Add(readPermission);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
         await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
@@ -3979,23 +4124,23 @@ public class QueryBusinessTests : IntegrationTestBase
         var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
         Context.ChangeTracker.Clear();
 
-        var writePermission = await Context.Permissions.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-        var readPermission = await Context.Permissions.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-        var downloadPermission = await Context.Permissions.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "download file");
-
-        var role = await Context.Roles.Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null && readPermission != null && downloadPermission != null)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            role.Permissions.Add(writePermission);
-            role.Permissions.Add(readPermission);
-            role.Permissions.Add(downloadPermission);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+        {
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = downloadActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
         await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
@@ -4024,17 +4169,7 @@ public class QueryBusinessTests : IntegrationTestBase
         var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
         Context.ChangeTracker.Clear();
 
-        var writePermission = await Context.Permissions.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
-        var role = await Context.Roles.Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null)
-        {
-            role.Permissions.Add(writePermission);
-            await Context.SaveChangesAsync();
-        }
 
         Context.ChangeTracker.Clear();
         await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
@@ -4049,6 +4184,247 @@ public class QueryBusinessTests : IntegrationTestBase
         // Assert - SysAdmin always sees URI
         Assert.NotNull(rex);
         Assert.NotNull(rex.Uri);
+    }
+
+    [Fact]
+    public async Task QueryBuilder_RejectsSqlInjectionInFilter()
+    {
+        var dto = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Filter = "id = 1 OR 1=1 OR qr.id",
+            Operator = "=",
+            Value = "62"
+        };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]));
+
+        Assert.Contains("Invalid filter field", ex.Message);
+    }
+
+    [Fact]
+    public async Task QueryBuilder_RejectsNonAllowlistedFilter()
+    {
+        var dto = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Filter = "Class", // not a real column - real column is "class_name"
+            Operator = "=",
+            Value = "File"
+        };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]));
+
+        Assert.Contains("Invalid filter field", ex.Message);
+    }
+
+    [Fact]
+    public async Task QueryBuilder_AcceptsValidAllowlistedFilter()
+    {
+        var dto = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Filter = "name",
+            Operator = "=",
+            Value = "Captain Rex"
+        };
+
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
+
+        Assert.NotNull(result);
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public async Task QueryBuilder_AllowlistIsCaseInsensitive()
+    {
+        var dto = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Filter = "NAME", // uppercase - should still match "name"
+            Operator = "=",
+            Value = "Captain Rex"
+        };
+
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
+
+        Assert.NotNull(result);
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public async Task QueryBuilder_EmptyFilterArray_StillSucceeds()
+    {
+        // Empty filter array should bypass the per-condition validation entirely
+        // and just return records matching the base org/project scope.
+        var result = await _queryBusiness.QueryBuilder(uid, [], organizationId, [pid]);
+
+        Assert.NotNull(result);
+    }
+
+    [Fact]
+    public async Task QueryBuilderPaginated_RejectsSqlInjectionInFilter()
+    {
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionInProject(uid, pid, "read", "record"))
+            .ReturnsAsync(true);
+
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionsInProjects(uid, It.Is<long[]>(p => p.SequenceEqual(new long[] { pid })), "read", "record"))
+            .ReturnsAsync([pid]);
+
+        _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService, _projectRolePermissionServiceMock.Object);
+
+        var dto = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Filter = "id = 1 OR 1=1 OR qr.id",
+            Operator = "=",
+            Value = "62"
+        };
+
+        var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _queryBusiness.QueryBuilderPaginated(uid, [dto], organizationId, [pid], paginated));
+
+        Assert.Contains("Invalid filter field", ex.Message);
+    }
+
+    [Fact]
+    public async Task QueryBuilderPaginated_AcceptsValidAllowlistedFilter()
+    {
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionInProject(uid, pid, "read", "record"))
+            .ReturnsAsync(true);
+
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionsInProjects(uid, It.Is<long[]>(p => p.SequenceEqual(new long[] { pid })), "read", "record"))
+            .ReturnsAsync([pid]);
+
+        _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService, _projectRolePermissionServiceMock.Object);
+
+        var dto = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Filter = "name",
+            Operator = "=",
+            Value = "Captain Rex"
+        };
+
+        var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        var result = await _queryBusiness.QueryBuilderPaginated(uid, [dto], organizationId, [pid], paginated);
+
+        Assert.NotNull(result);
+        Assert.NotEmpty(result.Items);
+    }
+
+    #endregion
+
+    #region QueryBuilderPaginated JSONB Tag Tests
+
+    private async Task<(Tag tagA, Tag tagCat, Tag tagDog, Record recA, Record recCat, Record recDog)> SeedTagRecordsAsync()
+    {
+        // Names use a "qbptag" token that won't collide with the shared fixture's own tags -
+        // a bare "a" or "cat" would also match pre-existing fixture records in this project.
+        var tagA = new Tag { Name = "qbptag", ProjectId = pid, OrganizationId = organizationId };
+        var tagCat = new Tag { Name = "qbptagcat", ProjectId = pid, OrganizationId = organizationId };
+        var tagDog = new Tag { Name = "unrelatedqxz", ProjectId = pid, OrganizationId = organizationId };
+        Context.Tags.AddRange(tagA, tagCat, tagDog);
+        await Context.SaveChangesAsync();
+
+        var recA = new Record
+        {
+            Name = "Record A",
+            Description = "Tag equality test record",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = pid,
+            DataSourceId = did,
+            OrganizationId = organizationId,
+            Properties = "{}",
+            Tags = new List<Tag> { tagA }
+        };
+        var recCat = new Record
+        {
+            Name = "Record Cat",
+            Description = "Tag equality test record",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = pid,
+            DataSourceId = did,
+            OrganizationId = organizationId,
+            Properties = "{}",
+            Tags = new List<Tag> { tagCat }
+        };
+        var recDog = new Record
+        {
+            Name = "Record Dog",
+            Description = "Tag equality test record",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = pid,
+            DataSourceId = did,
+            OrganizationId = organizationId,
+            Properties = "{}",
+            Tags = new List<Tag> { tagDog }
+        };
+        Context.Records.AddRange(recA, recCat, recDog);
+        await Context.SaveChangesAsync();
+
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionInProject(uid, pid, "read", "record"))
+            .ReturnsAsync(true);
+
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionsInProjects(uid, It.Is<long[]>(p => p.SequenceEqual(new long[] { pid })), "read", "record"))
+            .ReturnsAsync([pid]);
+
+        _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService, _projectRolePermissionServiceMock.Object);
+
+        return (tagA, tagCat, tagDog, recA, recCat, recDog);
+    }
+
+    [Fact]
+    public async Task QueryBuilderPaginated_Success_FindsRecordsByPartialTagName()
+    {
+        await SeedTagRecordsAsync();
+
+        var dto = new CustomQueryDtos.CustomQueryRequestDto { Filter = "tags", Operator = "LIKE", Value = "qbptag" };
+        var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        var result = await _queryBusiness.QueryBuilderPaginated(uid, [dto], organizationId, [pid], paginated);
+
+        Assert.Equal(2, result.Items.Count);
+        Assert.All(result.Items, r => Assert.Contains(r.Name, new[] { "Record A", "Record Cat" }));
+    }
+
+    [Fact]
+    public async Task QueryBuilderPaginated_Success_TagLikeIsCaseInsensitive()
+    {
+        await SeedTagRecordsAsync();
+
+        var dto = new CustomQueryDtos.CustomQueryRequestDto { Filter = "tags", Operator = "LIKE", Value = "QBPTAGCAT" };
+        var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        var result = await _queryBusiness.QueryBuilderPaginated(uid, [dto], organizationId, [pid], paginated);
+
+        Assert.Single(result.Items);
+        Assert.Equal("Record Cat", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task QueryBuilderPaginated_Success_TagEqualityDoesNotMatchPartialTags()
+    {
+        // Guards against the merge-conflict regression where "=" on tags fell back to the
+        // plain-column branch and either lost tag matching entirely or matched substrings.
+        await SeedTagRecordsAsync();
+        var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        var dtoA = new CustomQueryDtos.CustomQueryRequestDto { Filter = "tags", Operator = "=", Value = "qbptag" };
+        var resultA = await _queryBusiness.QueryBuilderPaginated(uid, [dtoA], organizationId, [pid], paginated);
+        Assert.Single(resultA.Items);
+        Assert.Equal("Record A", resultA.Items.First().Name);
+
+        // "qbptagc" is a prefix of the "qbptagcat" tag but not an exact tag name -
+        // if "=" ever regresses to a substring match, this would incorrectly return Record Cat.
+        var dtoD = new CustomQueryDtos.CustomQueryRequestDto { Filter = "tags", Operator = "=", Value = "qbptagc" };
+        var resultD = await _queryBusiness.QueryBuilderPaginated(uid, [dtoD], organizationId, [pid], paginated);
+        Assert.Empty(resultD.Items);
     }
 
     #endregion

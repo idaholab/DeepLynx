@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using System.ComponentModel;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace deeplynx.business;
 
@@ -23,13 +24,18 @@ public class FileAzureBusiness : IFileBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly EncryptionHelper _encryptionHelper;
+    private readonly ITimeLimitedDataProtector _downloadProtector;
 
     public FileAzureBusiness(
         DeeplynxContext context,
-        EncryptionHelper encryptionHelper)
+        EncryptionHelper encryptionHelper,
+        IDataProtectionProvider dataProtectionProvider)
     {
         _context = context;
         _encryptionHelper = encryptionHelper;
+        _downloadProtector = dataProtectionProvider
+            .CreateProtector(RecordUrlHelper.DownloadProtector)
+            .ToTimeLimitedDataProtector();
     }
 
     public async Task<string?> CalculateFileContentHash(
@@ -99,6 +105,7 @@ public class FileAzureBusiness : IFileBusiness
 
 
         var containerClient = new BlobContainerClient(azureConfig.AzureConnectionString, azureConfig.AzureContainerName);
+        // TODO(DL-2856): fix SAS fallback download URL by removing blob "exists" checks
         await containerClient.CreateIfNotExistsAsync();
 
         var blobClient = containerClient.GetBlobClient(filePath);
@@ -108,6 +115,8 @@ public class FileAzureBusiness : IFileBusiness
 
         return filePath;
     }
+
+
 
     /// <summary>
     /// Replaces old file with a new one in Azure Object Storage
@@ -197,8 +206,16 @@ public class FileAzureBusiness : IFileBusiness
         }
         else
         {
+            var organization = await _context.Organizations
+                .Where(o => o.Id == organizationId)
+                .Select(o => new { o.DefaultObjectStorageId })
+                .FirstOrDefaultAsync() ?? throw new KeyNotFoundException($"Organization with id {organizationId} not found");
+
+            if (organization.DefaultObjectStorageId == null)
+                throw new KeyNotFoundException("No default object storage ID set for the organization.");
+
             var defaultObjectStorage = await _context.ObjectStorages
-                .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Default && os.Type == "azure_object")
+                .Where(os => os.Id == organization.DefaultObjectStorageId && os.OrganizationId == organizationId && os.ProjectId == null && os.Type == "azure_object")
                 .FirstOrDefaultAsync() ?? throw new KeyNotFoundException("No default Azure object storage found for the organization.");
 
             var azureConfig = DeserializeAndDecryptConfig(defaultObjectStorage.ConfigEncrypted);
@@ -260,6 +277,7 @@ public class FileAzureBusiness : IFileBusiness
             objectStorageConfig.AzureObjectConfig.AzureConnectionString,
             objectStorageConfig.AzureObjectConfig.AzureContainerName);
 
+        // TODO(DL-2856): fix SAS fallback download URL by removing container "exists" checks
         if (!await container.ExistsAsync())
         {
             throw new InvalidOperationException("Azure Object Storage container does not exist");
@@ -267,6 +285,7 @@ public class FileAzureBusiness : IFileBusiness
 
         var blob = container.GetBlobClient(record.Uri);
 
+        // TODO(DL-2856): fix SAS fallback download URL by removing blob "exists" checks
         if (!await blob.ExistsAsync())
         {
             throw new FileNotFoundException($"File not found: {record.Uri}");
@@ -546,18 +565,22 @@ public class FileAzureBusiness : IFileBusiness
     }
 
     /// <summary>
-    /// Generates a pre-signed URL (SAS token) for downloading a file directly from Azure Blob Storage
+    /// Generates a pre-signed URL (SAS token) for downloading a file directly from Azure Blob Storage.
+    /// Falls back to generic download URL that allows downloading records directly if SAS is disabled.
     /// </summary>
     /// <param name="record"></param>
     /// <param name="objectStorageConfig"></param>
     /// <param name="expirationHours">Hours until the SAS token expires (default: 1)</param>
+    /// <param name="directUrl">Direct download URL for token auth (default: null)</param>
     /// <returns>Pre-signed URL with SAS token for direct download</returns>
     /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="FileNotFoundException"></exception>
     public async Task<string> GenerateDownloadUrl(
         RecordResponseDto record,
         ObjectStorageConfigDto objectStorageConfig,
-        int expirationHours = 1)
+        int expirationHours = 1,
+        string? directUrl = null)
     {
         if (record.Uri == null)
         {
@@ -573,6 +596,13 @@ public class FileAzureBusiness : IFileBusiness
         var containerClient = new BlobContainerClient(
             objectStorageConfig.AzureObjectConfig.AzureConnectionString,
             objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+        if (!containerClient.CanGenerateSasUri)
+        {
+            // TODO(DL-2856): uploading/downloading Azure files from SAS fallback URL will fail
+            //                because of permission issues when checking blob/container exists
+            return RecordUrlHelper.GenerateGenericDownloadUrl(_downloadProtector, directUrl, record.Id, record.Uri, expirationHours);
+        }
 
         // Verify container exists
         if (!await containerClient.ExistsAsync())
@@ -590,11 +620,12 @@ public class FileAzureBusiness : IFileBusiness
             throw new FileNotFoundException($"File not found: {record.Uri}");
         }
 
-        // Check if the blob client can generate SAS URI
+        // Fall back to generic download if SAS fails
         if (!blobClient.CanGenerateSasUri)
         {
-            await DownloadFile(record, objectStorageConfig);
-            return "Cannot Create SAS URI";
+            // TODO(DL-2856): uploading/downloading Azure files from SAS fallback URL will fail
+            //                because of permission issues when checking blob/container exists
+            return RecordUrlHelper.GenerateGenericDownloadUrl(_downloadProtector, directUrl, record.Id, record.Uri, expirationHours);
         }
 
         // Create SAS builder with read permissions

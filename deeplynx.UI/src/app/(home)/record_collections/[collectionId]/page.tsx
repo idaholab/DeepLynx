@@ -30,7 +30,7 @@ export default async function Page({ params }: Props) {
     return notFound();
   }
 
-  const initialCollectionRecords = await getRecordsInRecordCollectionServer(
+  const { items: initialCollectionRecords } = await getRecordsInRecordCollectionServer(
     organizationId,
     projectId,
     parsedCollectionId,

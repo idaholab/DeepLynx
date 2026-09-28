@@ -17,6 +17,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace deeplynx.tests;
 
@@ -52,6 +53,8 @@ public class FileBusinessTests : IntegrationTestBase
     private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
     private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
+    private ObjectStorageConfigDto _osConfig = null!;
+    private ITimeLimitedDataProtector _downloadProtector = null!;
 
     public long did; // datasource ID
     public long oid; // organization ID
@@ -95,12 +98,12 @@ public class FileBusinessTests : IntegrationTestBase
 
         _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
 
-        _dataSourceBusiness =
-            new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
+        _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness,
+            _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
 
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _sensitivityLabelService = new SensitivityLabelService(Context);
@@ -115,10 +118,19 @@ public class FileBusinessTests : IntegrationTestBase
             _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
 
         _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
-        _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness.Object, _eventBusiness);
+        _classBusiness = new ClassBusiness(Context,
+        _recordBusiness,
+        _relationshipBusiness.Object,
+        _eventBusiness,
+        _mockPermissionService.Object,
+        _mockAdminService.Object);
 
+        var protectProvider = new EphemeralDataProtectionProvider();
+        _downloadProtector = protectProvider
+            .CreateProtector(RecordUrlHelper.DownloadProtector)
+            .ToTimeLimitedDataProtector();
         var realFileFilesystemBusiness =
-            new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
+            new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness, protectProvider);
 
         _fileBusinessFactory
             .Setup(x => x.CreateFileBusiness("filesystem"))
@@ -134,7 +146,8 @@ public class FileBusinessTests : IntegrationTestBase
             _olapBusiness,
             _objectStorageBusiness,
             NullLogger<FileBusiness>.Instance,
-            _eventBusiness
+            _eventBusiness,
+            protectProvider
         );
     }
 
@@ -177,7 +190,7 @@ public class FileBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         did = dataSource.Id;
 
-        var osConfig = new ObjectStorageConfigDto
+        _osConfig = new ObjectStorageConfigDto
         {
             MountPath = _testDirectory
         };
@@ -188,13 +201,20 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = pid,
             OrganizationId = oid,
             Type = "filesystem",
-            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(osConfig),
-            Default = true
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(_osConfig),
         };
 
         Context.ObjectStorages.Add(objectStorage);
         await Context.SaveChangesAsync();
         osid = objectStorage.Id;
+
+        project.DefaultObjectStorageId = osid;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
+
+        organization.DefaultObjectStorageId = osid;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
 
         var testClass = new Class
         {
@@ -224,6 +244,25 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     #region Helpers
+
+
+    private static FormFile CreateMockFile(string fileName, string content)
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        var stream = new MemoryStream(bytes)
+        {
+            Position = 0
+        };
+        var contentType = fileName.EndsWith(".csv", StringComparison.InvariantCultureIgnoreCase)
+            ? "text/csv"
+            : "text/plain";
+
+        return new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = contentType
+        };
+    }
 
     private IFormFile CreateFormFile(string content)
     {
@@ -281,6 +320,100 @@ public class FileBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GenerateDownloadUrl Tests
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Success_ReturnsValidSasUri()
+    {
+        // Arrange
+        var mockFile = CreateMockFile("mock_valid_sas.txt", "MOCK CONTENT");
+
+        // Upload file first
+        var recordDto = await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, mockFile);
+
+        var filesystem = _fileBusinessFactory.Object.CreateFileBusiness("filesystem");
+
+        // Act
+        var result = await filesystem.GenerateDownloadUrl(
+            recordDto, _osConfig, expirationHours: 1, directUrl: "https://example.com");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.StartsWith("https://example.com?token=", result);
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Success_ValidatesToken()
+    {
+        // Arrange
+        var mockFile = CreateMockFile("mock_valid_sas.txt", "MOCK CONTENT");
+
+        // Upload file first
+        var recordDto = await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, mockFile);
+
+        var filesystem = _fileBusinessFactory.Object.CreateFileBusiness("filesystem");
+
+        // Act
+        var result = await filesystem.GenerateDownloadUrl(
+            recordDto, _osConfig, expirationHours: 1, directUrl: "https://example.com");
+
+        var token = result.Split("https://example.com?token=")[1];
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(RecordUrlHelper.IsValidToken(_downloadProtector, token, recordDto.Id));
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Failure_ValidatesTokenModified()
+    {
+        // Arrange
+        var mockFile = CreateMockFile("mock_valid_sas.txt", "MOCK CONTENT");
+
+        // Upload file first
+        var recordDto = await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, mockFile);
+
+        var filesystem = _fileBusinessFactory.Object.CreateFileBusiness("filesystem");
+
+        // Act
+        var result = await filesystem.GenerateDownloadUrl(
+            recordDto, _osConfig, expirationHours: 1, directUrl: "https://example.com");
+
+        var token = "MODIFIED" + result.Split("https://example.com?token=")[1];
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(RecordUrlHelper.IsValidToken(_downloadProtector, token, recordDto.Id));
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Failure_ValidatesTokenRecordDifferent()
+    {
+        // Arrange
+        var mockFile = CreateMockFile("mock_valid_sas.txt", "MOCK CONTENT");
+
+        // Upload file first
+        var recordDto = await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, mockFile);
+
+        var filesystem = _fileBusinessFactory.Object.CreateFileBusiness("filesystem");
+
+        // Act
+        var result = await filesystem.GenerateDownloadUrl(
+            recordDto, _osConfig, expirationHours: 1, directUrl: "https://example.com");
+
+        var token = result.Split("https://example.com?token=")[1];
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(RecordUrlHelper.IsValidToken(_downloadProtector, token, recordDto.Id + 1));
+    }
+
+    #endregion
+
     #region UploadFile Tests
 
     [Fact]
@@ -329,7 +462,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
@@ -381,7 +513,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
@@ -429,7 +560,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(secondaryOsConfig),
-            Default = false // Not the default
         };
 
         Context.ObjectStorages.Add(secondaryObjectStorage);
@@ -517,7 +647,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = otherOrg.Id, // Different org
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(otherOrgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(otherOrgStorage);
@@ -555,7 +684,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = false
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
@@ -612,7 +740,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = false
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
@@ -654,6 +781,47 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(metadata.Name, result1.Name);
         Assert.Equal(metadata.Description, result1.Description);
         Assert.Equal(metadata.OriginalId, result1.OriginalId);
+    }
+
+    [Fact]
+    public async Task UploadFile_MetadataWithoutOriginalId_UsesGeneratedGuid()
+    {
+        // Arrange
+        var content = "File without explicit OriginalId";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "no-original-id.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        // Metadata deliberately omits OriginalId, which is now optional
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "No OriginalId",
+            Description = "Should fall back to generated guid",
+            Properties = new JsonObject { ["Name"] = "Name" }
+            // OriginalId intentionally not set
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(metadata.Name, result.Name);
+        Assert.Equal(metadata.Description, result.Description);
+        Assert.False(string.IsNullOrWhiteSpace(result.OriginalId));
+        Assert.True(Guid.TryParse(result.OriginalId, out _), "OriginalId should be a generated GUID when not provided");
     }
 
     [Fact]
@@ -821,6 +989,43 @@ public class FileBusinessTests : IntegrationTestBase
         // Assert: Explicit ClassId in metadata wins over the Timeseries upgrade
         Assert.NotNull(result);
         Assert.Equal(fileClass.Id, result.ClassId);
+    }
+
+    [Fact]
+    public async Task UploadFile_MetadataFileWithTags_AttachesTagsToRecord()
+    {
+        // Arrange
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes("hello world"));
+        var file = new FormFile(ms, 0, ms.Length, "file", "notes.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Tagged File",
+            Description = "File with tags supplied via metadata file",
+            Properties = new JsonObject(),
+            OriginalId = "tagged-file-original-id",
+            Tags = new List<string> { "Tag1", "Tag2" }
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile);
+
+        // Assert: Tags from the metadata file are attached to the created record
+        Assert.NotNull(result);
+        Assert.Equal(new[] { "Tag1", "Tag2" }, result.Tags.Select(tag => tag.Name).OrderBy(name => name));
     }
 
     [Fact]
@@ -1219,6 +1424,48 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task UpdateFile_WithFilesystemHashing_ReplacesPreviousContentHash()
+    {
+        await using var originalStream = new MemoryStream(Encoding.UTF8.GetBytes("original"));
+        var originalFile = new FormFile(
+            originalStream,
+            0,
+            originalStream.Length,
+            "file",
+            "original.txt");
+        var originalRecord = await _fileBusiness.UploadFile(
+            uid,
+            oid,
+            pid,
+            did,
+            osid,
+            originalFile);
+
+        var storedRecord = await Context.Records.FindAsync(originalRecord.Id);
+        storedRecord!.FileContentHash = new string('a', 64);
+        await Context.SaveChangesAsync();
+
+        await using var updatedStream = new MemoryStream(Encoding.UTF8.GetBytes("updated"));
+        var updatedFile = new FormFile(
+            updatedStream,
+            0,
+            updatedStream.Length,
+            "file",
+            "updated.txt");
+
+        var updatedRecord = await _fileBusiness.UpdateFile(
+            uid,
+            oid,
+            pid,
+            originalRecord.Id,
+            updatedFile);
+
+        const string expectedHash = "27eb5e51506c911f6fc4bb345c0d9db6f60415fceab7c18e1e9b862637415777";
+        Assert.Equal(expectedHash, updatedRecord.FileContentHash);
+        Assert.Equal(expectedHash, (await Context.Records.FindAsync(originalRecord.Id))!.FileContentHash);
+    }
+
+    [Fact]
     public async Task UpdateFile_WithProjectDefault_WorksCorrectly()
     {
         // Arrange: Upload using project default
@@ -1267,15 +1514,23 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
         await Context.SaveChangesAsync();
         var orgOsId = orgObjectStorage.Id;
 
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
         var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
-        projectStorage.Default = false;
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         // Upload using org default
@@ -1307,6 +1562,108 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(orgOsId, updatedRecord.ObjectStorageId);
         Assert.True(updatedRecord.Uri.Contains(_orgDefaultDirectory));
         Assert.False(updatedRecord.Uri.Contains(_testDirectory));
+    }
+
+    [Fact]
+    public async Task UpdateFile_WithOriginalProperties_WorksCorrectly()
+    {
+        // Arrange: set up the file and metadata
+        var content = "Original content";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "update-default.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata",
+            Description = "Description",
+            Properties = new JsonObject { ["Test"] = "Property" },
+            OriginalId = "OriginalId"
+        };
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        var originalRecord = await _fileBusiness.UploadFile(uid, oid, pid, did, null, file, null, metadataFile);
+
+        // Update the file
+        var newContent = "Updated with default";
+        var newMs = new MemoryStream(Encoding.UTF8.GetBytes(newContent));
+        var newFile = new FormFile(newMs, 0, newMs.Length, "file", "updated-default.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        // Act
+        var updatedRecord = await _fileBusiness.UpdateFile(uid, oid, pid, originalRecord.Id, newFile);
+
+        // Assert
+        var properties = JsonNode.Parse(updatedRecord.Properties)!.AsObject();
+        Assert.Equal("Property", properties["Test"]?.GetValue<string>());
+        Assert.Equal("txt", properties["fileType"]?.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task UpdateFile_WithMetadata_WorksCorrectly()
+    {
+        // Arrange: set up the file
+        var content = "Original content";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "update-default.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var originalRecord = await _fileBusiness.UploadFile(uid, oid, pid, did, null, file, null);
+
+        // Update the file
+        var newContent = "Updated with default";
+        var newMs = new MemoryStream(Encoding.UTF8.GetBytes(newContent));
+        var newFile = new FormFile(newMs, 0, newMs.Length, "file", "updated-default.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata File",
+            Description = "Awesome Description",
+            Properties = new JsonObject { ["Test"] = "Property" },
+            OriginalId = "OriginalId",
+            Tags = new List<string> { "Tag1", "Tag2" }
+        };
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var updatedRecord = await _fileBusiness.UpdateFile(uid, oid, pid, originalRecord.Id, newFile, null, null, null, metadataFile);
+
+        // Assert
+        Assert.NotNull(updatedRecord);
+        Assert.Equal("Metadata File", updatedRecord.Name);
+        Assert.Equal("Awesome Description", updatedRecord.Description);
+        Assert.Equal("OriginalId", updatedRecord.OriginalId);
+        var properties = JsonNode.Parse(updatedRecord.Properties)!.AsObject();
+        Assert.Equal("Property", properties["Test"]?.GetValue<string>());
+        Assert.Equal("txt", properties["fileType"]?.GetValue<string>());
+        Assert.Equal(new[] { "Tag1", "Tag2" }, updatedRecord.Tags.Select(tag => tag.Name).OrderBy(name => name));
     }
 
     #endregion
@@ -1475,14 +1832,9 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
-        await Context.SaveChangesAsync();
-
-        var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
-        projectStorage.Default = false;
         await Context.SaveChangesAsync();
 
         // Upload file using org default
@@ -1580,14 +1932,20 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
         await Context.SaveChangesAsync();
 
-        var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
-        projectStorage.Default = false;
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         var content = "Delete test";
@@ -1689,14 +2047,19 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
         await Context.SaveChangesAsync();
 
-        var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
-        projectStorage.Default = false;
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         var session = await _fileBusiness.StartUpload(
@@ -2358,7 +2721,291 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CompleteUpload_DoesNotCalculateFileContentHash()
+    {
+        // Arrange: chunked uploads skip hash calculation to avoid timeouts on large files
+        // (see TODO in FileBusiness.CompleteUpload: hash calc is deferred until a background job runner exists)
+        var fileName = "no-hash.txt";
+        var session = await _fileBusiness.StartUpload(
+            oid, pid, did, osid, new FileUploadInitRequestDto { FileName = fileName, FileSize = 4 });
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("data"), session.UploadId, 0);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = fileName,
+            TotalChunks = 1
+        };
+
+        // Act
+        var result = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest);
+
+        // Assert
+        Assert.Null(result.FileContentHash);
+        var storedRecord = await Context.Records.FindAsync(result.Id);
+        Assert.Null(storedRecord!.FileContentHash);
+    }
+
+    [Fact]
+    public async Task CompleteUpdateUpload_ReplacesChunkUploadedFileContent()
+    {
+        var initialContent = "original content";
+        var initialSession = await _fileBusiness.StartUpload(
+            oid,
+            pid,
+            did,
+            osid,
+            new FileUploadInitRequestDto { FileName = "original.txt", FileSize = Encoding.UTF8.GetByteCount(initialContent) });
+
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("original "), initialSession.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("content"), initialSession.UploadId, 1);
+
+        var initialCompleteRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = initialSession.UploadId,
+            FileName = "original.txt",
+            TotalChunks = 2
+        };
+
+        var initialRecord = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, initialCompleteRequest);
+        var originalUri = initialRecord.Uri;
+
+        var updatedContent = "updated content";
+        var session = await _fileBusiness.StartUpdateUpload(
+            uid,
+            oid,
+            pid,
+            initialRecord.Id,
+            new FileUploadInitRequestDto { FileName = "updated.txt", FileSize = Encoding.UTF8.GetByteCount(updatedContent) });
+
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("updated "), session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("content"), session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = "updated.txt",
+            TotalChunks = 2
+        };
+
+        var updatedRecord = await _fileBusiness.CompleteUpdateUpload(uid, oid, pid, initialRecord.Id, completeRequest);
+        var downloadedFile = await _fileBusiness.DownloadFile(uid, oid, pid, updatedRecord.Id);
+
+        using var reader = new StreamReader(downloadedFile.FileStream);
+        var downloadedContent = await reader.ReadToEndAsync();
+
+        Assert.Equal(initialRecord.Id, updatedRecord.Id);
+        Assert.Equal("updated.txt", updatedRecord.Name);
+        Assert.Equal(osid, updatedRecord.ObjectStorageId);
+        Assert.Equal(did, updatedRecord.DataSourceId);
+        Assert.Equal(Encoding.UTF8.GetByteCount(updatedContent), updatedRecord.FileSize);
+        Assert.True(File.Exists(updatedRecord.Uri));
+        Assert.Equal(updatedContent, await File.ReadAllTextAsync(updatedRecord.Uri));
+        Assert.Equal(updatedContent, downloadedContent);
+        Assert.False(File.Exists(originalUri));
+    }
+
+    [Fact]
+    public async Task CompleteUpdateUpload_ReplacesExistingFileContentHashWithNull()
+    {
+        // Arrange: an existing record with a stale hash from before this file was replaced
+        var initialSession = await _fileBusiness.StartUpload(
+            oid, pid, did, osid, new FileUploadInitRequestDto { FileName = "original.txt", FileSize = 7 });
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("original"), initialSession.UploadId, 0);
+
+        var initialRecord = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, new FileUploadCompleteRequestDto
+        {
+            UploadId = initialSession.UploadId,
+            FileName = "original.txt",
+            TotalChunks = 1
+        });
+
+        var storedRecord = await Context.Records.FindAsync(initialRecord.Id);
+        storedRecord!.FileContentHash = new string('a', 64);
+        await Context.SaveChangesAsync();
+
+        var session = await _fileBusiness.StartUpdateUpload(
+            uid, oid, pid, initialRecord.Id, new FileUploadInitRequestDto { FileName = "updated.txt", FileSize = 7 });
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("updated"), session.UploadId, 0);
+
+        // Act: replacing the file's content should clear the now-stale hash, not leave it in place
+        var updatedRecord = await _fileBusiness.CompleteUpdateUpload(uid, oid, pid, initialRecord.Id, new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = "updated.txt",
+            TotalChunks = 1
+        });
+
+        // Assert
+        Assert.Null(updatedRecord.FileContentHash);
+        Assert.Null((await Context.Records.FindAsync(initialRecord.Id))!.FileContentHash);
+    }
+
+    [Fact]
+    public async Task CompleteUpdateUpload_MetadataStaysCorrect()
+    {
+        // Arrange
+        var initialContent = "original content";
+        var initialSession = await _fileBusiness.StartUpload(
+            oid,
+            pid,
+            did,
+            osid,
+            new FileUploadInitRequestDto { FileName = "original.txt", FileSize = Encoding.UTF8.GetByteCount(initialContent) });
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata",
+            Description = "Description",
+            Properties = new JsonObject { ["Test"] = "Property" },
+            OriginalId = "OriginalId"
+        };
+
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("original "), initialSession.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("content"), initialSession.UploadId, 1);
+
+        var initialCompleteRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = initialSession.UploadId,
+            FileName = "original.txt",
+            TotalChunks = 2
+        };
+
+        var initialRecord = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, initialCompleteRequest, null, metadata);
+
+        var updatedContent = "updated content";
+        var session = await _fileBusiness.StartUpdateUpload(
+            uid,
+            oid,
+            pid,
+            initialRecord.Id,
+            new FileUploadInitRequestDto { FileName = "updated.txt", FileSize = Encoding.UTF8.GetByteCount(updatedContent) });
+
+        // Act
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("updated "), session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("content"), session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = "updated.txt",
+            TotalChunks = 2
+        };
+
+        var updatedRecord = await _fileBusiness.CompleteUpdateUpload(uid, oid, pid, initialRecord.Id, completeRequest);
+
+        // Assert
+        var properties = JsonNode.Parse(updatedRecord.Properties)!.AsObject();
+        Assert.Equal("Property", properties["Test"]?.GetValue<string>());
+        Assert.Equal("txt", properties["fileType"]?.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task CompleteUpdateUpload_WithMetadata_UpdatesCorrectly()
+    {
+        // Arrange
+        var initialContent = "original content";
+        var initialSession = await _fileBusiness.StartUpload(
+            oid,
+            pid,
+            did,
+            osid,
+            new FileUploadInitRequestDto { FileName = "original.txt", FileSize = Encoding.UTF8.GetByteCount(initialContent) });
+
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("original "), initialSession.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("content"), initialSession.UploadId, 1);
+
+        var initialCompleteRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = initialSession.UploadId,
+            FileName = "original.txt",
+            TotalChunks = 2
+        };
+
+        var initialRecord = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, initialCompleteRequest, null);
+
+        var updatedContent = "updated content";
+        var session = await _fileBusiness.StartUpdateUpload(
+            uid,
+            oid,
+            pid,
+            initialRecord.Id,
+            new FileUploadInitRequestDto { FileName = "updated.txt", FileSize = Encoding.UTF8.GetByteCount(updatedContent) });
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata File",
+            Description = "Awesome Description",
+            Properties = new JsonObject { ["Test"] = "Property" },
+            OriginalId = "OriginalId",
+            Tags = new List<string> { "Tag1", "Tag2" }
+        };
+
+        // Act
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("updated "), session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("content"), session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = "updated.txt",
+            TotalChunks = 2
+        };
+
+        var updatedRecord = await _fileBusiness.CompleteUpdateUpload(uid, oid, pid, initialRecord.Id, completeRequest, null, null, null, metadata);
+
+        // Assert
+        Assert.NotNull(updatedRecord);
+        Assert.Equal("Metadata File", updatedRecord.Name);
+        Assert.Equal("Awesome Description", updatedRecord.Description);
+        Assert.Equal("OriginalId", updatedRecord.OriginalId);
+        var properties = JsonNode.Parse(updatedRecord.Properties)!.AsObject();
+        Assert.Equal("Property", properties["Test"]?.GetValue<string>());
+        Assert.Equal("txt", properties["fileType"]?.GetValue<string>());
+        Assert.Equal(new[] { "Tag1", "Tag2" }, updatedRecord.Tags.Select(tag => tag.Name).OrderBy(name => name));
+    }
+
+    [Fact]
+    public async Task CancelUpdateUpload_CleansUpUploadSession()
+    {
+        var initialContent = "original content";
+        var initialStream = new MemoryStream(Encoding.UTF8.GetBytes(initialContent));
+        var initialFile = new FormFile(initialStream, 0, initialStream.Length, "file", "original.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var initialRecord = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, initialFile);
+
+        var session = await _fileBusiness.StartUpdateUpload(
+            uid,
+            oid,
+            pid,
+            initialRecord.Id,
+            new FileUploadInitRequestDto { FileName = "updated.txt", FileSize = 2048 });
+
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("chunk0"), session.UploadId, 0);
+
+        var uploadPath = Path.Combine(
+            _testDirectory,
+            $"org_{oid}",
+            $"project_{pid}",
+            $"datasource_{did}",
+            "uploads",
+            session.UploadId
+        );
+
+        Assert.True(Directory.Exists(uploadPath));
+        Assert.True(File.Exists(Path.Combine(uploadPath, "0.part")));
+
+        await _fileBusiness.CancelUpdateUpload(uid, oid, pid, initialRecord.Id, session.UploadId);
+
+        Assert.False(Directory.Exists(uploadPath));
+    }
+
+    [Fact]
     public async Task CompleteUpload_CsvFile_AssignsTimeseriesClassAndExtractsColumns()
+
     {
         // Arrange
         var csvContent = "timestamp,temperature,humidity\n2024-01-01,22.5,60.1\n2024-01-02,23.0,58.3";
@@ -2654,7 +3301,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "azure_object",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(new ObjectStorageConfigDto()),
-            Default = false
         };
 
         Context.ObjectStorages.Add(azureObjectStorage);
@@ -2784,6 +3430,49 @@ public class FileBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotNull(result);
         Assert.Equal(fileClass.Id, result.ClassId);
+    }
+
+    [Fact]
+    public async Task CompleteUpload_MetadataWithTags_AttachesTagsToRecord()
+    {
+        // Arrange
+        var fileName = "final.txt";
+        var initRequest = new FileUploadInitRequestDto
+        {
+            FileName = fileName,
+            FileSize = 2048
+        };
+
+        var session = await _fileBusiness.StartUpload(oid, pid, did, osid, initRequest);
+
+        var chunk0 = CreateFormFile("first-");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk0, session.UploadId, 0);
+
+        var chunk1 = CreateFormFile("second");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk1, session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = fileName,
+            TotalChunks = 2
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Tagged Chunked File",
+            Description = "File with tags supplied via chunked upload metadata",
+            Properties = new JsonObject(),
+            OriginalId = "tagged-chunked-file-original-id",
+            Tags = new List<string> { "Tag1", "Tag2" }
+        };
+
+        // Act
+        var result = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest, metadata: metadata);
+
+        // Assert: Tags from the completion request's metadata are attached to the created record
+        Assert.NotNull(result);
+        Assert.Equal(new[] { "Tag1", "Tag2" }, result.Tags.Select(tag => tag.Name).OrderBy(name => name));
     }
 
     [Fact]
@@ -3203,15 +3892,19 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
         await Context.SaveChangesAsync();
 
-        // Remove project-level default
-        var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
-        projectStorage.Default = false;
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         var request = new FileUploadInitRequestDto
@@ -3271,7 +3964,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
@@ -3403,15 +4095,20 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
         await Context.SaveChangesAsync();
         var orgOsId = orgObjectStorage.Id;
 
-        var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
-        projectStorage.Default = false;
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         var session = await _fileBusiness.StartUpload(
@@ -3488,16 +4185,20 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
         await Context.SaveChangesAsync();
         var orgOsId = orgObjectStorage.Id;
 
-        // Disable project default
-        var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
-        projectStorage.Default = false;
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         var content = "Test file content";
@@ -3526,28 +4227,6 @@ public class FileBusinessTests : IntegrationTestBase
             $"File should be in org directory. Actual: {result.Uri}");
         Assert.False(result.Uri.Contains(_testDirectory),
             $"File should NOT be in project directory. Actual: {result.Uri}");
-    }
-
-    [Fact]
-    public async Task StartUpload_NoDefaultFound_ThrowsException()
-    {
-        // Arrange: Remove all default flags
-        var allStorages = Context.ObjectStorages.Where(os => os.OrganizationId == oid);
-        foreach (var storage in allStorages) storage.Default = false;
-        await Context.SaveChangesAsync();
-
-        var request = new FileUploadInitRequestDto
-        {
-            FileName = "no-default.txt",
-            FileSize = 2048
-        };
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _fileBusiness.StartUpload(oid, pid, did, null, request)
-        );
-
-        Assert.Contains("Default object storage not found", exception.Message);
     }
 
     #endregion
@@ -4935,6 +5614,83 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task UploadPart_WhenUploadCompletes_DoesNotCalculateFileContentHash()
+    {
+        // Arrange
+        const string uploadId = "test-tus-upload-complete-no-hash";
+        const long uploadOffset = 25;
+        const long uploadLength = 50;
+        const long expectedNewOffset = 50;
+        const string fileName = "tus-no-hash.txt";
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("final chunk"));
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        var completedFilePath = Path.Combine(_testDirectory, "completed-tus-no-hash.txt");
+        await File.WriteAllTextAsync(completedFilePath, "final file contents");
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.IsAny<ObjectStorageConfigDto>(),
+                uploadBody))
+            .ReturnsAsync(expectedNewOffset);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.IsAny<ObjectStorageConfigDto>()))
+            .ReturnsAsync(uploadLength);
+
+        innerFileBusiness
+            .Setup(x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.IsAny<ObjectStorageConfigDto>()))
+            .ReturnsAsync(fileName);
+
+        innerFileBusiness
+            .Setup(x => x.CompleteUploadTus(
+                oid,
+                pid,
+                did,
+                It.IsAny<ObjectStorageConfigDto>(),
+                uploadId,
+                It.IsAny<Guid>(),
+                fileName))
+            .ReturnsAsync(completedFilePath);
+
+        // Act: this Tus branch reaches the same deferred-hash TODO as the chunked upload paths
+        var result = await _fileBusiness.UploadPartTus(
+            oid,
+            pid,
+            did,
+            osid,
+            uploadId,
+            uploadOffset,
+            uid,
+            uploadBody);
+
+        // Assert
+        Assert.Equal(expectedNewOffset, result);
+        var createdRecord = Context.Records.Single(r => r.Name == fileName);
+        Assert.Null(createdRecord.FileContentHash);
+    }
+
+    [Fact]
     public async Task UploadPart_WhenNewOffsetExceedsUploadLength_ThrowsInvalidOperationException()
     {
         // Arrange
@@ -5837,7 +6593,154 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(fileClass.Id, createdRecord.ClassId);
     }
     #endregion
+    
+    #region File Count Cache Invalidation Tests
 
+    private static async Task SeedFileCountCacheSentinels(long organizationId, long projectId)
+    {
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectFileCount(projectId, true), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectFileCount(projectId, false), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationFileCount(organizationId, true), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationFileCount(organizationId, false), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.SystemFileCount(true), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.SystemFileCount(false), 999, (TimeSpan?)null);
+    }
+
+    private static async Task AssertAllFileCountCacheKeysCleared(long organizationId, long projectId)
+    {
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectFileCount(projectId, true)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectFileCount(projectId, false)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.OrganizationFileCount(organizationId, true)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.OrganizationFileCount(organizationId, false)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.SystemFileCount(true)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.SystemFileCount(false)));
+    }
+
+    [Fact]
+    public async Task UploadFile_InvalidatesFileCountCache()
+    {
+        await SeedFileCountCacheSentinels(oid, pid);
+
+        var content = "Cache invalidation upload test";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "cache-invalidation-upload.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        await AssertAllFileCountCacheKeysCleared(oid, pid);
+    }
+
+    [Fact]
+    public async Task DeleteFile_InvalidatesFileCountCache()
+    {
+        var content = "Cache invalidation delete test";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "cache-invalidation-delete.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        await SeedFileCountCacheSentinels(oid, pid);
+
+        await _fileBusiness.DeleteFile(uid, oid, pid, record.Id);
+
+        await AssertAllFileCountCacheKeysCleared(oid, pid);
+    }
+
+    [Fact]
+    public async Task UploadFile_DoesNotInvalidateUnrelatedProjectsCache()
+    {
+        // Arrange: a second project in the same organization
+        var project2 = new Project { Name = "Unrelated Project", OrganizationId = oid };
+        Context.Projects.Add(project2);
+        await Context.SaveChangesAsync();
+        var pid2 = project2.Id;
+
+        var pid2Key = CacheKeys.ProjectFileCount(pid2, true);
+        await CacheService.Instance.SetAsync(pid2Key, 999, (TimeSpan?)null);
+        await SeedFileCountCacheSentinels(oid, pid);
+
+        var content = "Scoped invalidation test";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "scoped-invalidation.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // pid's own project-scope key is cleared
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectFileCount(pid, true)));
+
+        // pid2's key is untouched — the invalidation is scoped to the mutated project only
+        Assert.Equal(999, await CacheService.Instance.GetAsync<int?>(pid2Key));
+    }
+
+    #endregion
+    #region Data Modality Count Cache Invalidation Tests
+
+    private static async Task SeedModalityCountCacheSentinels(long organizationId, long projectId)
+    {
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectModalityCount(projectId), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationModalityCount(organizationId), 999, (TimeSpan?)null);
+    }
+
+    private static async Task AssertAllModalityCountCacheKeysCleared(long organizationId, long projectId)
+    {
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectModalityCount(projectId)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.OrganizationModalityCount(organizationId)));
+    }
+
+    [Fact]
+    public async Task UploadFile_InvalidatesModalityCountCache()
+    {
+        await SeedModalityCountCacheSentinels(oid, pid);
+
+        var content = "Modality cache invalidation upload test";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "modality-cache-invalidation-upload.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        await AssertAllModalityCountCacheKeysCleared(oid, pid);
+    }
+
+    [Fact]
+    public async Task DeleteFile_InvalidatesModalityCountCache()
+    {
+        // DeleteFile bypasses RecordBusiness.DeleteRecord (it calls a private DeleteFileRecordOnly
+        // helper directly), so invalidation must be wired up explicitly on this path too — this
+        // test exists specifically to catch that gap.
+        var content = "Modality cache invalidation delete test";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "modality-cache-invalidation-delete.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        await SeedModalityCountCacheSentinels(oid, pid);
+
+        await _fileBusiness.DeleteFile(uid, oid, pid, record.Id);
+
+        await AssertAllModalityCountCacheKeysCleared(oid, pid);
+    }
+
+    #endregion
 
     private static IFormFile CreateTestCsvFile(string content, string fileName = "test.csv")
     {

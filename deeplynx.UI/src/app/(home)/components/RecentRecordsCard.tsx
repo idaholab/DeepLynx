@@ -81,12 +81,12 @@ const RecentRecordsCard: React.FC<Props> = ({
         const fetchActiveClasses = async () => {
             try {
                 const projectIds = selectedProjects.map((id) => Number(id));
-                const classesArrays = await Promise.all(
+                const classesResponses = await Promise.all(
                     projectIds.map((projectId) => getAllClasses(projectId, true))
                 );
                 if (cancelled) return;
 
-                const allClasses = classesArrays.flat();
+                const allClasses = classesResponses.flatMap((res) => res.items);
                 const classNamesSet = new Set(allClasses.map((cls) => cls.name));
                 setActiveClassNames(classNamesSet);
             } catch (error) {
@@ -223,7 +223,7 @@ function RecordView({ record, activeClassNames }: RecordViewProps) {
             className="border-b border-base-content/40 cursor-pointer hover:bg-base-100/40 p-3 -mx-1 transition-colors"
             onClick={() => handleRecordClick()}
         >
-            <div className="font-medium text-base-content mb-2 line-clamp-1 overflow-hidden break-all">
+            <div className="font-medium text-base-content mb-2 line-clamp-1 overflow-hidden break-all" role='link' aria-label={record.name}>
                 {record.name}
             </div>
 

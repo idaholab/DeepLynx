@@ -1,0 +1,147 @@
+using Asp.Versioning;
+using deeplynx.interfaces;
+using deeplynx.models.ResponseDTOs;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using deeplynx.helpers;
+using deeplynx.models;
+
+namespace deeplynx.api.Controllers.V2;
+
+/// <summary>
+///     Controller for retrieving provenance records.
+/// </summary>
+/// <remarks>
+///     This controller provides endpoints to retrieve individual provenance records and provenance history for a record.
+/// </remarks>
+[ApiController]
+[ApiVersion(2)]
+[Route("organizations/{organizationId:long}/projects/{projectId:long}/records/provenance")]
+[Authorize]
+[Tags("Provenance")]
+public class ProvenanceController : ControllerBase
+{
+    private readonly IProvenanceBusiness _provenanceBusiness;
+    private readonly ILogger<ProvenanceController> _logger;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="ProvenanceController" /> class
+    /// </summary>
+    /// <param name="provenanceBusiness">The business logic interface for handling provenance operations.</param>
+    /// <param name="logger">Error/Info logging interface for database log table.</param>
+    public ProvenanceController(IProvenanceBusiness provenanceBusiness,
+        ILogger<ProvenanceController> logger)
+    {
+        _provenanceBusiness = provenanceBusiness;
+        _logger = logger;
+    }
+
+    /// <summary>
+    ///     Get a Provenance Record
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record belongs</param>
+    /// <param name="provenanceRecordId">The database ID of the provenance record to retrieve</param>
+    /// <returns>The matching provenance record</returns>
+    [HttpGet("{provenanceRecordId:long}", Name = "api_get_a_provenance_record")]
+    [Auth("read", "record")]
+    [Sensitivity("read record")]
+    public async Task<ActionResult<ProvenanceRecordResponseDto>> GetProvenanceRecord(
+        long organizationId,
+        long projectId,
+        long provenanceRecordId)
+    {
+        try
+        {
+            var provenanceRecord = await _provenanceBusiness.GetProvenanceRecord(provenanceRecordId);
+            return Ok(provenanceRecord);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving provenance record {provenanceRecordId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Get Provenance History
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record belongs</param>
+    /// <param name="recordId">The ID of the record for which to retrieve provenance history</param>
+    /// <returns>A list of all provenance records for the given record, most recent first</returns>
+    [HttpGet("{recordId:long}/history", Name = "api_get_provenance_history")]
+    [Auth("read", "record")]
+    [Sensitivity("read record")]
+    public async Task<ActionResult<ProvenanceHistoryResponseDto>> GetProvenanceHistory(
+        long organizationId,
+        long projectId,
+        long recordId)
+    {
+        try
+        {
+            var history = await _provenanceBusiness.GetProvenanceHistory(recordId);
+            return Ok(history);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving provenance history for record {recordId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Get Project-Level Provenance History
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project for which to retrieve provenance history</param>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
+    /// <returns>
+    ///     A paginated list of every provenance record ever created for the project, most recent
+    ///     first, including provenance for records that have since been deleted.
+    /// </returns>
+    [HttpGet("project-history", Name = "api_get_provenance_history_for_project")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<PaginatedResponse<ProvenanceRecordResponseDto>>> GetProjectProvenanceHistory(
+        long organizationId,
+        long projectId,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
+    {
+        paginatedRequestDto ??= new PaginatedRequestDto();
+        var history = await _provenanceBusiness.GetProjectProvenanceHistory(projectId, paginatedRequestDto);
+        return Ok(history);
+    }
+
+    /// <summary>
+    ///     Verify a Record's Provenance Chain
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record belongs</param>
+    /// <param name="recordId">The ID of the record whose provenance chain is being verified</param>
+    /// <param name="checkpointRecordId">
+    ///     (Optional) A previously-verified provenance record ID to resume verification from,
+    ///     instead of walking the whole chain from genesis
+    /// </param>
+    /// <returns>A report describing whether the chain (or the portion after the checkpoint) is intact</returns>
+    [HttpGet("{recordId:long}/verify", Name = "api_verify_provenance_chain")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<ProvenanceChainVerificationResponseDto>> VerifyProvenanceChain(
+        long organizationId,
+        long projectId,
+        long recordId,
+        [FromQuery] long? checkpointRecordId = null)
+    {
+        var result = await _provenanceBusiness.VerifyProvenanceChain(recordId, checkpointRecordId);
+        return Ok(result);
+    }
+}

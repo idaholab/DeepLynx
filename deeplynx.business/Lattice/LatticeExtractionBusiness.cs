@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
@@ -26,14 +28,19 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     private readonly InsightServiceClient _insightServiceClient;
     private readonly IProvenanceBusiness _provenanceBusiness;
     private readonly LatticeContext _latticeContext;
+    private readonly ITagBusiness _tagBusiness;
+    private readonly IRecordBusiness _recordBusiness;
     private readonly ILogger<LatticeExtractionBusiness> _logger;
 
     public LatticeExtractionBusiness(DeeplynxContext context, LatticeContext latticeContext,
         IInsightBusiness insightBusiness, InsightServiceClient insightServiceClient,
-        IProvenanceBusiness provenanceBusiness, ILogger<LatticeExtractionBusiness> logger)
+        IProvenanceBusiness provenanceBusiness, ILogger<LatticeExtractionBusiness> logger, ITagBusiness tagBusiness,
+        IRecordBusiness recordBusiness)
     {
         _context = context;
         _latticeContext = latticeContext;
+        _tagBusiness = tagBusiness;
+        _recordBusiness = recordBusiness;
         _insightBusiness = insightBusiness;
         _insightServiceClient = insightServiceClient;
         _provenanceBusiness = provenanceBusiness;
@@ -86,9 +93,26 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             CreatedBy = currentUserId,
             Status = ExtractionStatus.Pending,
             Mode = mode,
-            ProjectId = projectId
+            ProjectId = projectId,
+            SourceRecordId = recordId
         };
         _context.Extractions.Add(extraction);
+        await _context.SaveChangesAsync();
+
+        if (record.ExtractionId.HasValue)
+        {
+            var previousExtraction = await _context.Extractions
+                .FirstOrDefaultAsync(e => e.Id == record.ExtractionId.Value);
+
+            if (previousExtraction != null)
+            {
+                _context.Extractions.Remove(previousExtraction);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        record.ExtractionId = extraction.Id;
+        _context.Records.Update(record);
         await _context.SaveChangesAsync();
 
         try
@@ -167,6 +191,75 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         //     _logger.LogWarning("Failed to create provenance record for embedding trigger on record {RecordId}", recordId);
 
         return extraction.Id;
+    }
+
+    /// <summary>
+    /// Processes progress updates for an extraction.
+    /// </summary>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The ID of the extraction.</param>
+    /// <param name="progressDto">The progress update payload.</param>
+    /// <returns>True if the progress update was successfully processed.</returns>
+    public async Task<bool> ProcessExtractionProgress(
+        long projectId,
+        long extractionId,
+        InsightExtractionProgressCombinedDto progressDto)
+    {
+        var extraction = await _context.Extractions.FindAsync(extractionId)
+                    ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
+        EnsureExtractionInProject(extraction, projectId);
+
+        JsonObject? propertiesJson = null;
+        if (!string.IsNullOrEmpty(extraction.Properties))
+        {
+            propertiesJson = JsonNode.Parse(extraction.Properties) as JsonObject;
+        }
+        propertiesJson ??= [];
+
+        var progressRoot = propertiesJson["progress"] as JsonObject ?? [];
+
+        foreach (var kvp in progressDto.Progress)
+        {
+            string stageKey = kvp.Key.ToLowerInvariant();
+            var stageValue = kvp.Value;
+
+            var stageNode = new JsonObject
+            {
+                ["stage"] = stageValue.Stage,
+                ["detail"] = stageValue.Detail,
+                ["count"] = stageValue.Count
+            };
+
+            progressRoot[stageKey] = stageNode;
+        }
+
+        propertiesJson["progress"] = progressRoot;
+
+        extraction.Properties = propertiesJson.ToJsonString(new JsonSerializerOptions
+        {
+            WriteIndented = false
+        });
+
+        try
+        {
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "Progress update for extraction {ExtractionId}: stages updated: {Stages}",
+                extractionId,
+                string.Join(", ", progressDto.Progress.Keys)
+            );
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to update progress for extraction {ExtractionId}",
+                extractionId);
+            return false;
+        }
     }
 
 
@@ -336,6 +429,30 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     ///     List extractions for project
     /// </summary>
     /// <param name="projectId">The ID of the project</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if null, all matching classes are returned unpaginated</param>
+    public async Task<PaginatedResponse<ExtractionListItemDto>> ListExtractionsByProjectPaginated(
+        long projectId,
+        PaginatedRequestDto paginatedRequestDto)
+    {
+        var query = _context.Extractions
+            .Where(e => e.ProjectId == projectId)
+            .OrderByDescending(e => e.Id)
+            .Select(e => ExtractionToResponse(e));
+
+        var totalCount = await query.CountAsync();
+
+        return await query.ToPaginatedAsync(paginatedRequestDto);
+    }
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all lattice extractions without pagination.
+    ///     Superseded by <see cref="ListExtractionsByProjectPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 lattice extraction controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="projectId">The ID of the project</param>
+    [Obsolete("V1-only. Used by deprecated v1 lattice extraction endpoints. Superseded by ListExtractionsByProjectPaginated. " +
+              "Remove once v1 lattice extraction endpoints are sunset.", error: false)]
     public async Task<List<ExtractionListItemDto>> ListExtractionsByProject(long projectId)
     {
         var extractions = await _context.Extractions
@@ -469,7 +586,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         ValidateRejectedNotSelected(stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
             selectedClassIds, selectedRecordIds, selectedRelIds, selectedEdgeIds);
 
-        ValidateDependencies(stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
+        await ValidateDependencies(stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
             selectedClassIds, selectedRecordIds, selectedRelIds, selectedEdgeIds);
 
         var classesPromotedBefore = stagingClasses.Where(c => c.PromotedId.HasValue).Select(c => c.Id).ToHashSet();
@@ -477,20 +594,29 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var relsPromotedBefore = stagingRelationships.Where(r => r.PromotedId.HasValue).Select(r => r.Id).ToHashSet();
         var edgesPromotedBefore = stagingEdges.Where(e => e.PromotedId.HasValue).Select(e => e.Id).ToHashSet();
 
-        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await using var deepLynxTransaction = await _context.Database.BeginTransactionAsync();
+        await using var latticeTransaction = await _latticeContext.Database.BeginTransactionAsync();
+
         try
         {
             var classIdMap = await PromoteClasses(stagingClasses, selectedClassIds, organizationId, projectId,
                 extractionId, currentUserId, now);
             var relIdMap = await PromoteRelationships(stagingRelationships, selectedRelIds, classIdMap, organizationId,
                 projectId, extractionId, currentUserId, now);
-            var recordIdMap = await PromoteRecords(stagingRecords, selectedRecordIds, classIdMap, organizationId,
+            var (RecordIdMap, NewRecordCount, RecordTagLinks) = await PromoteRecords(stagingRecords, selectedRecordIds, classIdMap, organizationId,
                 projectId, extractionId, currentUserId, now);
-            await PromoteEdges(stagingEdges, selectedEdgeIds, recordIdMap.RecordIdMap, relIdMap, organizationId,
+            await PromoteEdges(stagingEdges, selectedEdgeIds, RecordIdMap, relIdMap, organizationId,
                 projectId,
                 extractionId, currentUserId, now);
 
-            await transaction.CommitAsync();
+            await deepLynxTransaction.CommitAsync();
+            await latticeTransaction.CommitAsync();
+
+            if (RecordTagLinks.Count != 0)
+            {
+                await _recordBusiness.BulkInsertRecordTagLinks(RecordTagLinks);
+            }
+
             extraction.Status = ComputeExtractionStatus(
                 stagingClasses, stagingRecords, stagingRelationships, stagingEdges, extraction.Status);
             await _context.SaveChangesAsync();
@@ -499,15 +625,16 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             {
                 Id = extractionId,
                 CreatedBy = extraction.CreatedBy,
-                ClassCount = stagingClasses.Count(c => c.PromotedId.HasValue && !classesPromotedBefore.Contains(c.Id)),
-                RecordCount = stagingRecords.Count(r => r.PromotedId.HasValue && !recordsPromotedBefore.Contains(r.Id)),
-                RelationshipCount = stagingRelationships.Count(r => r.PromotedId.HasValue && !relsPromotedBefore.Contains(r.Id)),
-                EdgeCount = stagingEdges.Count(e => e.PromotedId.HasValue && !edgesPromotedBefore.Contains(e.Id))
+                ClassCount = stagingClasses.Count(c => c.PromotedId.HasValue),
+                RecordCount = stagingRecords.Count(r => r.PromotedId.HasValue),
+                RelationshipCount = stagingRelationships.Count(r => r.PromotedId.HasValue),
+                EdgeCount = stagingEdges.Count(e => e.PromotedId.HasValue)
             };
         }
         catch
         {
-            await transaction.RollbackAsync();
+            await deepLynxTransaction.RollbackAsync();
+            await latticeTransaction.RollbackAsync();
             throw;
         }
     }
@@ -737,7 +864,9 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             Status = extraction.Status,
             Mode = extraction.Mode,
             CreatedBy = extraction.CreatedBy,
+            Properties = extraction.Properties,
             FailureMessage = GetExtractionFailureMessage(extraction.Properties),
+            RecordId = extraction.SourceRecordId,
             Classes = classes.Select(c => new StagedClassDto
             {
                 Id = c.Id,
@@ -1032,9 +1161,31 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         string stage,
         string message)
     {
+        if (message != null && message.Contains("Unclosed JSON object in LLM output", StringComparison.OrdinalIgnoreCase))
+        {
+            message = "The document is too large for Lattice to process";
+        }
+
         var properties = GetExtractionProperties(extraction.Properties);
         properties["failure_stage"] = stage;
-        properties["failure_message"] = message;
+
+        HashSet<string> failureMessages;
+        if (properties.ContainsKey("failure_message"))
+        {
+            var failureMessageValue = properties["failure_message"]?.ToString();
+            failureMessages = failureMessageValue != null
+            ? [.. failureMessageValue.Split(" | ", StringSplitOptions.RemoveEmptyEntries)]
+            : [];
+        }
+        else
+        {
+            failureMessages = [];
+        }
+
+        failureMessages.Add(message);
+
+        properties["failure_message"] = string.Join(" | ", failureMessages);
+
         properties["failed_at"] = DateTimeOffset.UtcNow.ToString("O");
         extraction.Properties = properties.ToJsonString();
     }
@@ -1109,5 +1260,19 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 extraction.Id,
                 stage,
                 message);
+    }
+
+    private static ExtractionListItemDto ExtractionToResponse(Extraction e)
+    {
+        return new ExtractionListItemDto
+        {
+            Id = e.Id,
+            Status = e.Status,
+            Mode = e.Mode,
+            CreatedBy = e.CreatedBy,
+            ProjectId = e.ProjectId,
+            SourceRecordId = e.SourceRecordId,
+            FailureMessage = GetExtractionFailureMessage(e.Properties)
+        };
     }
 }

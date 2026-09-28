@@ -47,7 +47,7 @@ public class InsightBusiness : IInsightBusiness
     ///     Fires an upload request to Insight and returns immediately.
     ///     Insight manages its own RabbitMQ queue internally, so embedding progress
     ///     can be tracked via <see cref="FetchInsightIngestionStatus"/> without blocking the caller.
-    ///     Maps to POST /upload_document.
+    ///     Maps to POST /upload.
     /// </summary>
     /// <param name="currentUserId">The ID of the user making the request. Used to resolve model tokens when required.</param>
     /// <param name="organizationId">The ID of the organization. Used to scope model config resolution.</param>
@@ -60,6 +60,7 @@ public class InsightBusiness : IInsightBusiness
     /// </param>
     /// <param name="payload">Upload dto from the caller containing file IDs and URIs.</param>
     /// <param name="userJwt">The requesting user's JWT used for forwarding to Insight</param>
+    /// <param name="isAdmin">Determines if the requesting user is admin in the system, org, or project scope</param>
     /// <exception cref="InvalidOperationException">Thrown when Insight returns a non-success status, or when a required token is missing.</exception>
     /// <exception cref="KeyNotFoundException">Thrown when a specified or default model config cannot be found.</exception>
     public async Task QueueInsightUpload(
@@ -69,7 +70,8 @@ public class InsightBusiness : IInsightBusiness
         long? vlmModelConfigId,
         long? embeddingModelConfigId,
         InsightUploadApiRequestDto payload,
-        string? userJwt = null)
+        string? userJwt = null,
+        bool isAdmin = false)
     {
         if (payload.FileInfo.Count == 0)
             throw new InvalidOperationException("Select at least one document to queue for Insight indexing.");
@@ -78,9 +80,8 @@ public class InsightBusiness : IInsightBusiness
         var embeddingConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
         var recordIds = payload.FileInfo.Select(f => f.FileId).ToList();
-
         var authorizedIds = await _sensitivityLabelService
-            .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
+            .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context, isAdmin);
 
         var authorizedFileInfo = payload.FileInfo
             .Where(f => authorizedIds.Contains(f.FileId))
@@ -222,6 +223,48 @@ public class InsightBusiness : IInsightBusiness
     public Task<InsightIngestionStatusResponseDto> FetchInsightIngestionStatus(long recordId)
     {
         return _insightServiceClient.GetIngestionStatus(recordId);
+    }
+
+    /// <summary>
+    ///     Fetches the persistent upload pipeline status for a record from Insight
+    ///     after validating that the record belongs to the requested organization/project
+    ///     and that the current user is authorized to read it.
+    ///     Maps to GET /pipeline_status/{recordId}.
+    /// </summary>
+    /// <param name="currentUserId">The ID of the user making the request.</param>
+    /// <param name="organizationId">The ID of the organization to which the record belongs.</param>
+    /// <param name="projectId">The ID of the project to which the record belongs.</param>
+    /// <param name="recordId">The Insight file ID to check.</param>
+    /// <returns>The parsed pipeline status from Insight.</returns>
+    /// <exception cref="KeyNotFoundException">Thrown when the record is not found in the requested organization/project or is archived.</exception>
+    /// <exception cref="UnauthorizedAccessException">Thrown when the current user is not authorized to read the record.</exception>
+    /// <exception cref="InsightServiceException">Thrown when Insight returns a non-success status.</exception>
+    public async Task<InsightPipelineStatusResponseDto> FetchInsightPipelineStatus(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId)
+    {
+        var recordExists = await _context.Records.AnyAsync(r =>
+            r.Id == recordId &&
+            r.OrganizationId == organizationId &&
+            r.ProjectId == projectId &&
+            !r.IsArchived);
+
+        if (!recordExists)
+            throw new KeyNotFoundException($"Record with id {recordId} not found");
+
+        var authorizedIds = await _sensitivityLabelService.FilterAuthorizedRecordIds(
+            currentUserId,
+            organizationId,
+            projectId,
+            [recordId],
+            _context);
+
+        if (!authorizedIds.Contains(recordId))
+            throw new UnauthorizedAccessException($"User is not authorized to access record {recordId}");
+
+        return await _insightServiceClient.GetPipelineStatus(recordId);
     }
 
     /// <summary>

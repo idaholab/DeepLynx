@@ -197,7 +197,7 @@ public class InvitationBusiness : IInvitationBusiness
     /// <param name="name"></param>
     /// <param name="makeProjectAdmin"></param>
     /// <returns></returns>
-    public async Task<bool> CreateAndAddServiceAccountToProject(long organizationId, long projectId, string name, long? roleId, bool makeProjectAdmin = false)
+    public async Task<UserResponseDto> CreateAndAddServiceAccountToProject(long organizationId, long projectId, string name, long? roleId, bool makeProjectAdmin = false)
     {
         var serviceIdentifier = $"service_{Guid.NewGuid()}";
 
@@ -219,7 +219,20 @@ public class InvitationBusiness : IInvitationBusiness
                 projectId, roleId, serviceAccount.Id,
                 groupId: null, makeProjectAdmin, allowServiceAccount: true);
 
-            return true;
+            var response = new UserResponseDto()
+            {
+                Id = serviceAccount.Id,
+                Name = serviceAccount.Name,
+                AccountType = serviceAccount.AccountType,
+                Email = serviceAccount.Email,
+                Username = serviceAccount.Username,
+                IsSysAdmin = serviceAccount.IsSysAdmin,
+                IsArchived = serviceAccount.IsArchived,
+                IsActive = serviceAccount.IsActive,
+                LastLogin = serviceAccount.LastLogin
+            };
+
+            return response;
         }
         catch (Exception ex)
         {

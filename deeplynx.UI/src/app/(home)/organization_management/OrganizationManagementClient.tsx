@@ -13,8 +13,9 @@ import {
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useEffect, useState } from "react";
-import InlineGroupsTable from "./groups/InlineGroupsTable";
+import OrganizationGroupsClient from "./groups/OrganizationGroupsClient";
 import RolesAndPermissions from "./roles_and_permissions/RolesAndPermissions";
+import OrganizationSensitivityLabelsClient from "./sensitivity_labels/OrganizationSensitivityLabelsClient";
 import OrganizationSettings from "./settings/OrganizationSettings";
 import TagManagementClient from "./tag_management/TagManagementClient";
 import UsersTable from "./users/UsersTable";
@@ -69,21 +70,26 @@ const OrganizationManagementClient = ({
     {
       label: t.translations.GROUPS,
       content: (
-        <InlineGroupsTable
+        <OrganizationGroupsClient
           initialGroups={initialGroups}
-          availableUsers={members}
-          organizationId={organization?.organizationId}
+          members={members}
+          labels={labels}
         />
       ),
     },
     {
-      label: t.translations.TAGS_AND_SECURITY_LABELS,
+      label: t.translations.SENSITIVITY_LABELS,
       content: (
-        <TagManagementClient
-          projects={initialProjects}
-          initialLabels={labels}
+        <OrganizationSensitivityLabelsClient
+          labels={labels}
+          members={members}
+          groups={initialGroups}
         />
       ),
+    },
+    {
+      label: t.translations.TAGS,
+      content: <TagManagementClient projects={initialProjects} />,
     },
     {
       label: t.translations.SETTINGS,
@@ -100,7 +106,7 @@ const OrganizationManagementClient = ({
   };
 
   return (
-    <main className="min-h-screen bg-base-200/30">
+    <main className="flex min-h-[calc(100vh-6.5rem)] flex-col bg-base-200/30">
       <section className="border-b border-base-300 bg-base-100">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
           <div>
@@ -114,7 +120,7 @@ const OrganizationManagementClient = ({
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
+      <section className="mx-auto w-full max-w-7xl flex-1 px-3 py-5 sm:px-6 lg:px-8">
         <Tabs
           tabs={tabData}
           className="mx-0"

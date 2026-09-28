@@ -26,7 +26,7 @@ type Props = {
 export default function CollectionRecordSearchResultsTable({
   rows,
   emptyMessage,
-  maxHeightClassName = "max-h-72",
+  maxHeightClassName = "max-h-90",
   pinnedHeader = true,
   leadingHeaderCell,
   actionHeaderCell,

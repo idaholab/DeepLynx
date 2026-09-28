@@ -8,7 +8,7 @@ import {
   getEdgeByRelationship,
   updateEdgeByRelationship,
 } from "@/app/lib/client_service/edge_services.client";
-import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
+import { fullTextSearchPaginated } from "@/app/lib/client_service/query_services.client";
 import { getEdgesByRecord } from "@/app/lib/client_service/record_services.client";
 import type { RelatedRecordsResponseDto } from "../../types/responseDTOs";
 import type { RecordSearchResult } from "../components/AddEdgeModal";
@@ -264,11 +264,15 @@ export function useRecordRelationships({
       if (organizationId == null) return [];
 
       try {
-        const results = await fullTextSearch(Number(organizationId), query, [
-          projectId,
-        ]);
+        const response = await fullTextSearchPaginated(
+          Number(organizationId),
+          query,
+          [projectId],
+          1,
+          -1,
+        );
 
-        return results.map((record) => ({
+        return response.items.map((record) => ({
           id: Number(record.id),
           name: record.name ?? String(record.id),
           description: record.description ?? undefined,

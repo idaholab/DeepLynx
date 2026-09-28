@@ -77,10 +77,15 @@ import { EmbeddingStatusResponseDTO } from "@/app/(home)/types/latticeDTOs";
 import {
   fetchInsightEndpointHealth,
   fetchInsightIngestionStatus,
+  fetchInsightPipelineStatus,
   queueInsightUpload,
+  type InsightEndpointHealthByRole,
+  type InsightModelHealthState,
 } from "@/app/lib/client_service/insight_services.client";
 import { isInsightHidden } from "@/app/lib/feature_flags";
 import { useInsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection";
+import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
+import { getProject } from "@/app/lib/client_service/projects_services.client";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -138,6 +143,18 @@ function parseNestedProperties(obj: JSON): PropertyRow[] {
   });
 }
 
+const EMPTY_HEALTH_STATE: InsightModelHealthState = {
+  isChecking: false,
+  response: null,
+  error: null,
+};
+
+const EMPTY_ENDPOINT_HEALTH: InsightEndpointHealthByRole = {
+  query: EMPTY_HEALTH_STATE,
+  upload: EMPTY_HEALTH_STATE,
+  embedding: EMPTY_HEALTH_STATE,
+};
+
 // ============= TYPE DEFINITIONS =============
 interface Props {
   projectId: number;
@@ -177,7 +194,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
 
   // UI State
+  const { project, setProject } = useProjectSession();
   const [activeTab, setActiveTab] = useState(0);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const [isPropertiesEditorOpen, setIsPropertiesEditorOpen] = useState(false);
   const [isSavingProperties, setIsSavingProperties] = useState(false);
@@ -192,9 +211,23 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [isCheckingLatticeReadiness, setIsCheckingLatticeReadiness] =
     useState(false);
   const [isRecordInsightEmbedded, setIsRecordInsightEmbedded] = useState(false);
-  const [isQueryModelUnavailable, setIsQueryModelUnavailable] = useState(false);
-  const [isUploadModelUnavailable, setIsUploadModelUnavailable] = useState(false);
-  const [isEmbeddingModelUnavailable, setIsEmbeddingModelUnavailable] = useState(false);
+  const [isRecordInsightEmbedding, setIsRecordInsightEmbedding] = useState(false);
+  const [endpointHealth, setEndpointHealth] = useState<InsightEndpointHealthByRole>(EMPTY_ENDPOINT_HEALTH);
+  const isQueryModelUnavailable =
+    endpointHealth.query.response !== null
+      ? !endpointHealth.query.response.reachable ||
+      !endpointHealth.query.response.model_available
+      : Boolean(endpointHealth.query.error);
+  const isUploadModelUnavailable =
+    endpointHealth.upload.response !== null
+      ? !endpointHealth.upload.response.reachable ||
+      !endpointHealth.upload.response.model_available
+      : Boolean(endpointHealth.upload.error);
+  const isEmbeddingModelUnavailable =
+    endpointHealth.embedding.response !== null
+      ? !endpointHealth.embedding.response.reachable ||
+      !endpointHealth.embedding.response.model_available
+      : Boolean(endpointHealth.embedding.error);
   const isChatUnavailable = isQueryModelUnavailable || isEmbeddingModelUnavailable;
   const isIngestionUnavailable = isUploadModelUnavailable || isEmbeddingModelUnavailable;
   const [hasCheckedInsightHealth, setHasCheckedInsightHealth] = useState(false);
@@ -209,6 +242,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     useState(false);
   const [ontologyPollTrigger, setOntologyPollTrigger] = useState(0);
   const ontologyPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
 
   const {
     originPage,
@@ -240,6 +275,21 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     recordDataSourceId: record?.dataSourceId,
     translations: t.translations,
   });
+
+  // ============= Loaded Project ==============
+  useEffect(() => {
+    if (project?.projectId === projectId) return;
+    let cancelled = false;
+    const loadProject = async () => {
+      const recordProject = await getProject(Number(organizationId), projectId);
+      if (cancelled) return;
+      setProject({ projectId, projectName: recordProject.name })
+    };
+    loadProject();
+    return () => {
+      cancelled = true;
+    }
+  }, [organizationId, setProject, projectId]);
 
   // ============= RECORD UPDATE HANDLERS =============
   const handleUpdateRecord = useCallback(
@@ -287,9 +337,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const resetAllState = useCallback(() => {
     setRecord(null);
     setRecordFileType(null);
-    setIsQueryModelUnavailable(false);
-    setIsUploadModelUnavailable(false);
-    setIsEmbeddingModelUnavailable(false);
+    setEndpointHealth(EMPTY_ENDPOINT_HEALTH);
     setHasCheckedInsightHealth(false);
     setSelectedTags([]);
     setSelectedIds([]);
@@ -449,7 +497,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
         setRecordFileType(liveRecord.fileType ?? null);
         setSelectedIds(mapSelectedIds(liveRecord.tags ?? []));
-        setSelectedLabelIds(mapSelectedIds(liveRecord.labels ?? []));
+        setSelectedLabelIds(mapSelectedIds(liveRecord.sensitivityLabels ?? []));
       } catch (error) {
         console.error("Error fetching record:", error);
         toast.error(t.translations.FAILED_TO_FETCH_RECORD);
@@ -510,7 +558,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
       try {
         const data = await getAllTags(projectId);
-        setTags(data);
+        setTags(data.items);
       } catch (error) {
         console.error("Error fetching tags:", error);
       }
@@ -553,7 +601,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
       try {
         setIsLoadingClasses(true);
-        const data = await getAllClasses(projectId, true);
+        const { items: data } = await getAllClasses(projectId, true);
         setAvailableClasses(data);
       } catch (error) {
         console.error("Error fetching classes: ", error);
@@ -635,6 +683,16 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       //   label: t.translations.FILE_SIZE,
       //   value: formatFileSize(record.fileSize)
       // },
+
+      ...(recordFileType
+        ? [
+          {
+            label: t.translations.FILE_TYPE || "File Type",
+            value: recordFileType,
+          },
+        ]
+        : []),
+
       ...(isDownloadable
         ? [
           {
@@ -772,12 +830,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         },
       );
 
-      const params = new URLSearchParams({
-        extractionId: String(result.extraction_id),
-        projectId: String(projectId),
-        organizationId: String(organization!.organizationId),
-      });
-      router.push(`/lattice/decisions?${params.toString()}`);
+      handleSelect(Number(result))
+      router.push(`/lattice/decisions`);
     } catch (error: any) {
       if (error?.response?.status === 400) {
         toast(t.translations.LATTICE_EMBEDDINGS_GENERATING, { icon: "⏳" });
@@ -798,6 +852,22 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     router,
   ]);
 
+  const onClickTriggerExtraction = async () => {
+
+    var originalRecord = await getRecord(organizationId as number, projectId, record?.id as number)
+
+    if (originalRecord?.extractionId != null) {
+      setShowConfirmDialog(true);
+    } else {
+      handleTriggerLatticeExtraction();
+    }
+  };
+
+  const handleSelect = (id: number) => {
+    setSelectedId(id);
+    if (projectId) localStorage.setItem(storageKey(projectId), String(id));
+  };
+
   const handleQueueInsightUpload = useCallback(async () => {
     if (isIngestionUnavailable) return;
 
@@ -813,6 +883,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         embeddingModelConfigId: selectedInsightModels.embeddingModelConfigId ?? undefined,
       });
       toast.success(t.translations.LATTICE_QUEUED_SUCCESS);
+      setIsRecordInsightEmbedding(true);
     } catch {
       toast.error(t.translations.LATTICE_QUEUE_FAILED);
     } finally {
@@ -845,6 +916,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     isEmbeddingModelUnavailable,
   ]);
 
+  function storageKey(projId: number) {
+    return `lattice_selected_extraction_${projId}`;
+  }
+
   const recordEmbedPollRef = useRef<ReturnType<typeof setInterval> | null>(
     null,
   );
@@ -859,6 +934,12 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     const checkLatticeReadiness = async () => {
       try {
         if (isInitial) setIsCheckingLatticeReadiness(true);
+
+        setEndpointHealth({
+          query: { ...EMPTY_HEALTH_STATE, isChecking: true },
+          upload: { ...EMPTY_HEALTH_STATE, isChecking: true },
+          embedding: { ...EMPTY_HEALTH_STATE, isChecking: true },
+        });
 
         const [queryHealth, uploadHealth, embeddingHealth] =
           await Promise.allSettled([
@@ -883,26 +964,59 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           ]);
 
         const queryUnavailable =
-          queryHealth.status === "rejected" ||
-          !queryHealth.value.reachable ||
-          !queryHealth.value.model_available;
+          queryHealth.status === "fulfilled"
+            ? !queryHealth.value.reachable || !queryHealth.value.model_available
+            : true;
 
         const uploadUnavailable =
-          uploadHealth.status === "rejected" ||
-          !uploadHealth.value.reachable ||
-          !uploadHealth.value.model_available;
+          uploadHealth.status === "fulfilled"
+            ? !uploadHealth.value.reachable || !uploadHealth.value.model_available
+            : true;
 
         const embeddingUnavailable =
-          embeddingHealth.status === "rejected" ||
-          !embeddingHealth.value.reachable ||
-          !embeddingHealth.value.model_available;
+          embeddingHealth.status === "fulfilled"
+            ? !embeddingHealth.value.reachable ||
+            !embeddingHealth.value.model_available
+            : true;
 
         if (cancelled) return;
 
         setHasCheckedInsightHealth(true);
-        setIsQueryModelUnavailable(queryUnavailable);
-        setIsUploadModelUnavailable(uploadUnavailable);
-        setIsEmbeddingModelUnavailable(embeddingUnavailable);
+        setEndpointHealth({
+          query:
+            queryHealth.status === "fulfilled"
+              ? { isChecking: false, response: queryHealth.value, error: null }
+              : {
+                isChecking: false,
+                response: null,
+                error:
+                  queryHealth.reason instanceof Error
+                    ? queryHealth.reason.message
+                    : "Query model health check failed",
+              },
+          upload:
+            uploadHealth.status === "fulfilled"
+              ? { isChecking: false, response: uploadHealth.value, error: null }
+              : {
+                isChecking: false,
+                response: null,
+                error:
+                  uploadHealth.reason instanceof Error
+                    ? uploadHealth.reason.message
+                    : "Upload/OCR model health check failed",
+              },
+          embedding:
+            embeddingHealth.status === "fulfilled"
+              ? { isChecking: false, response: embeddingHealth.value, error: null }
+              : {
+                isChecking: false,
+                response: null,
+                error:
+                  embeddingHealth.reason instanceof Error
+                    ? embeddingHealth.reason.message
+                    : "Embedding model health check failed",
+              },
+        });
 
         if (embeddingUnavailable) {
           setIsRecordInsightEmbedded(false);
@@ -921,12 +1035,33 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           fileId: recordId,
         });
 
+        try {
+          const pipelineStatus = await fetchInsightPipelineStatus({
+            organizationId: organization.organizationId as number,
+            projectId,
+            fileId: recordId
+          });
+          if (pipelineStatus.status == "in_progress") {
+            setIsRecordInsightEmbedding(true);
+          } else if (pipelineStatus.status == "completed") {
+            setIsRecordInsightEmbedding(false);
+          } else if (pipelineStatus.status == "No pipeline status exists for this record yet.") {
+            setIsRecordInsightEmbedding(false);
+          }
+        } catch (error) {
+          console.log("No pipeline status exists for this record yet.")
+        }
+
         if (cancelled) return;
 
         setHasCheckedInsightHealth(true);
         setIsRecordInsightEmbedded(status.indexed);
 
         if (status.indexed) {
+          if (!isInitial) {
+            toast.success(t.translations.EMBEDDED_SUCCESSFULLY)
+          }
+
           if (recordEmbedPollRef.current) {
             clearInterval(recordEmbedPollRef.current);
             recordEmbedPollRef.current = null;
@@ -943,9 +1078,23 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         if (cancelled) return;
 
         setHasCheckedInsightHealth(true);
-        setIsQueryModelUnavailable(true);
-        setIsUploadModelUnavailable(true);
-        setIsEmbeddingModelUnavailable(true);
+        setEndpointHealth({
+          query: {
+            isChecking: false,
+            response: null,
+            error: "Query model health check failed",
+          },
+          upload: {
+            isChecking: false,
+            response: null,
+            error: "Upload/OCR model health check failed",
+          },
+          embedding: {
+            isChecking: false,
+            response: null,
+            error: "Embedding model health check failed",
+          },
+        });
         setIsRecordInsightEmbedded(false);
 
         if (recordEmbedPollRef.current) {
@@ -1119,6 +1268,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 isIngestionUnavailable={!hasCheckedInsightHealth || isIngestionUnavailable}
                 selectedInsightModels={selectedInsightModels}
                 onSelectedInsightModelsChange={setSelectedInsightModels}
+                endpointHealth={endpointHealth}
               />
             ) : null}
 
@@ -1271,7 +1421,17 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 ) : (
                   <>
                     {!isRecordInsightEmbedded &&
-                      !isCheckingLatticeReadiness && (
+                      isRecordInsightEmbedding && (
+                        <div className="alert alert-warning">
+                          <span className="flex-1 text-sm">
+                            <span className="loading loading-spinner loading-sm" />
+                            {t.translations.PROJECT_INSIGHT_STATUS_PROCESSING}
+                          </span>
+                        </div>
+                      )}
+                    {!isRecordInsightEmbedded &&
+                      !isCheckingLatticeReadiness &&
+                      !isRecordInsightEmbedding && (
                         <div className="alert alert-warning">
                           <span className="flex-1 text-sm">
                             {t.translations.LATTICE_NOT_EMBEDDED_WARNING}
@@ -1441,7 +1601,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                       <button
                         type="button"
                         className="btn btn-primary btn-sm"
-                        onClick={handleTriggerLatticeExtraction}
+                        onClick={onClickTriggerExtraction}
                         disabled={
                           isTriggeringLatticeExtraction ||
                           isCheckingLatticeReadiness ||
@@ -1466,13 +1626,49 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                         )}
                       </button>
                       <Link
-                        href={`/lattice/decisions?projectId=${projectId}&organizationId=${organization.organizationId}`}
+                        href={`/lattice/decisions`}
                         className="btn btn-ghost btn-sm"
                       >
                         {t.translations.LATTICE_VIEW_EXTRACTIONS}
                         <ArrowTopRightOnSquareIcon className="size-4" />
                       </Link>
                     </div>
+
+                    {showConfirmDialog && (
+                      <div
+                        className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-10 z-50"
+                        style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }}
+                      >
+                        <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-lg">
+                          <h3 className="text-lg font-semibold mb-4">
+                            {t.translations.CONFIRM_EXTRACTION}
+                          </h3>
+                          <p className="mb-6">
+                            {t.translations.CONFIRM_OVERWRITE_PREVIOUS_EXTRACTION}
+                          </p>
+                          <div className="flex justify-end gap-3">
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              onClick={async () => {
+                                setShowConfirmDialog(false);
+                                await handleTriggerLatticeExtraction();
+                              }}
+                            >
+                              {t.translations.YES}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => setShowConfirmDialog(false)}
+                            >
+                              {t.translations.NO}
+                            </button>
+
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

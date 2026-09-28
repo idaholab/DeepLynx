@@ -21,15 +21,16 @@
         <PackageReference Include="System.Security.Cryptography.Xml" Version="8.0.4" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.2" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.2" />
+        <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.2" />
         <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.2" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
         <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" PrivateAssets="all" />
         <PackageReference Include="Moq" Version="4.20.72" />
         <PackageReference Include="Pgvector" Version="0.3.2" />
-        <PackageReference Include="Testcontainers" Version="4.10.0" />
-        <PackageReference Include="Testcontainers.PostgreSql" Version="4.10.0" />
-        <PackageReference Include="Testcontainers.Redis" Version="4.10.0" />
-        <PackageReference Include="Testcontainers.Azurite" Version="4.10.0" />
+        <PackageReference Include="Testcontainers" Version="4.14.0" />
+        <PackageReference Include="Testcontainers.PostgreSql" Version="4.14.0" />
+        <PackageReference Include="Testcontainers.Redis" Version="4.14.0" />
+        <PackageReference Include="Testcontainers.Azurite" Version="4.14.0" />
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
         <PackageReference Include="xunit" Version="2.9.3" />
         <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
@@ -53,6 +54,10 @@
       <ProjectReference Include="..\deeplynx.helpers\deeplynx.helpers.csproj" />
       <ProjectReference Include="..\deeplynx.interfaces\deeplynx.interfaces.csproj" />
       <ProjectReference Include="..\deeplynx.models\deeplynx.models.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Update="ExceptionHandlers\Snapshots\*.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
 </Project>

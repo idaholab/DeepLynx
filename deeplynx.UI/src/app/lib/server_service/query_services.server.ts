@@ -2,28 +2,37 @@
 import "server-only";
 import { apiFetch, asJson } from "./api.server";
 import { CustomQueryRequestDto } from "@/app/(home)/types/requestDTOs";
-import { HistoricalRecordResponseDto, QueryRecordViewResponseDto } from "@/app/(home)/types/responseDTOs";
+import { HistoricalRecordResponseDto, QueryRecordViewResponseDto, PaginatedResponse } from "@/app/(home)/types/responseDTOs";
 
 /**
- * Full text search for records (server-side)
+ * Full text search for records with server-side pagination (server-side)
  * @param organizationId - The ID of the organization
  * @param userQuery - String phrase entered by user
  * @param projectIds - Array of project IDs to search across
- * @returns Promise with array of HistoricalRecordResponseDto
+ * @param pageNumber - Page number to fetch
+ * @param pageSize - Number of records per page
+ * @param hideArchived - Flag to hide archived records (default: true)
+ * @returns Promise with paginated QueryRecordViewResponseDto
  */
-export async function fullTextSearchServer(
+export async function fullTextSearchPaginatedServer(
     organizationId: number,
     userQuery: string,
-    projectIds: number[]
-): Promise<QueryRecordViewResponseDto[]> {
+    projectIds: number[],
+    pageNumber: number,
+    pageSize: number,
+    hideArchived: boolean = true
+): Promise<PaginatedResponse<QueryRecordViewResponseDto>> {
     const searchParams = new URLSearchParams();
     searchParams.append("userQuery", userQuery);
     projectIds.forEach(id => searchParams.append("projectIds", id.toString()));
+    searchParams.append("hideArchived", hideArchived.toString());
+    searchParams.append("pageNumber", String(pageNumber ?? 1));
+    searchParams.append("pageSize", String(pageSize ?? 25));
 
     const path = `/organizations/${organizationId}/query/records?${searchParams.toString()}`;
 
     const res = await apiFetch(path);
-    return asJson<QueryRecordViewResponseDto[]>(res);
+    return asJson<PaginatedResponse<QueryRecordViewResponseDto>>(res);
 }
 
 /**
@@ -32,14 +41,18 @@ export async function fullTextSearchServer(
  * @param queryObj - Array of custom query request DTOs
  * @param projectIds - Array of project IDs to search across
  * @param textSearch - Optional full text search phrase
- * @returns Promise with array of HistoricalRecordResponseDto
+ * @param pageNumber - Page number to fetch; omit to use the API default
+ * @param pageSize - Page size; omit to use the API default, or pass -1 for all matching records
+ * @returns Promise with paginated HistoricalRecordResponseDto
  */
 export async function queryBuilderServer(
     organizationId: number,
     queryObj: CustomQueryRequestDto[],
     projectIds: number[],
-    textSearch?: string | null
-): Promise<HistoricalRecordResponseDto[]> {
+    textSearch?: string | null,
+    pageNumber?: number,
+    pageSize?: number
+): Promise<PaginatedResponse<HistoricalRecordResponseDto>> {
     // Building json string format from key/value input
     for (const obj of queryObj) {
         if (obj.jsonKey && obj.jsonValue) {
@@ -53,6 +66,8 @@ export async function queryBuilderServer(
     if (textSearch) {
         searchParams.append("textSearch", textSearch);
     }
+    if (pageNumber !== undefined) searchParams.append("pageNumber", pageNumber.toString());
+    if (pageSize !== undefined) searchParams.append("pageSize", pageSize.toString());
 
     const path = `/organizations/${organizationId}/query/records/advanced?${searchParams.toString()}`;
 
@@ -61,7 +76,7 @@ export async function queryBuilderServer(
         body: JSON.stringify(queryObj),
     });
 
-    return asJson<HistoricalRecordResponseDto[]>(res);
+    return asJson<PaginatedResponse<HistoricalRecordResponseDto>>(res);
 }
 
 /**

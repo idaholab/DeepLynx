@@ -11,15 +11,27 @@ namespace deeplynx.business
         private readonly IMemoryCache _cache;
         private readonly ConcurrentDictionary<string, bool> _keys;
 
+        // Hardcoded for now rather than env-configurable. Sized against the 2Gi container
+        // memory limit set in sandbox, dev, and presumably acceptance and prod. ~96MB is
+        // roughly 4.7% of that ceiling, leaving room for the .NET runtime, EF Core, Kestrel, and GC. 
+        // Possibly make this an env var in the future.
+        private const long CacheSizeLimitBytes = 96 * 1024 * 1024;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="MemoryCacheBusiness"/> class.
         /// </summary>
         public MemoryCacheBusiness()
         {
-            _cache = new MemoryCache(new MemoryCacheOptions());
+            _cache = new MemoryCache(new MemoryCacheOptions
+            {
+                SizeLimit = CacheSizeLimitBytes,
+                // On hitting the size limit, evict entries (LRU/priority-based) until
+                // 10% of capacity is freed, then insert the new entry.
+                CompactionPercentage = 0.10
+            });
             _keys = new ConcurrentDictionary<string, bool>();
         }
-        
+
         /// <summary>
         /// Static property that will return the cache type in use.
         /// </summary>
@@ -40,7 +52,6 @@ namespace deeplynx.business
             try
             {
                 var parsed = JsonConvert.DeserializeObject<T>(value);
-                await SetAsync("type", "memory", (TimeSpan?)null);
                 return await Task.FromResult(parsed);
             }
             catch
@@ -67,20 +78,36 @@ namespace deeplynx.business
         /// <returns>bool based on set success</returns>
         public Task<bool> SetAsync(string key, object value, TimeSpan? ttl = null)
         {
-            var cacheEntryOptions = new MemoryCacheEntryOptions();
+            var serializedValue = JsonConvert.SerializeObject(value);
+            var cacheEntryOptions = new MemoryCacheEntryOptions
+            {
+                // Required now that the cache has a SizeLimit — every entry must declare
+                // a size. Using serialized string length (chars) as a cheap proxy for cost;
+                // it undercounts true heap usage (object overhead, dictionary nodes, etc.)
+                // but is directionally correct and consistent across entries.
+                Size = serializedValue.Length
+            };
+
+            // Keep _keys in sync no matter how an entry leaves the cache - explicit removal,
+            // TTL expiry, or SizeLimit-triggered compaction eviction - so DeleteByPrefixAsync
+            // never operates on stale/already-evicted keys.
+            cacheEntryOptions.RegisterPostEvictionCallback((evictedKey, _, _, _) =>
+            {
+                _keys.TryRemove(evictedKey.ToString()!, out _);
+            });
+
             _keys[key] = true;
 
             if (ttl.HasValue)
             {
                 cacheEntryOptions.SetAbsoluteExpiration(ttl.Value);
             }
-
-            var serializedValue = JsonConvert.SerializeObject(value);
+            
             _cache.Set(key, serializedValue, cacheEntryOptions);
 
             return Task.FromResult(true);
         }
-        
+
         /// <summary>
         /// Operation to Set cache data with key value pair
         /// </summary>
@@ -101,11 +128,33 @@ namespace deeplynx.business
         /// <returns>bool based on delete success</returns>
         public Task<bool> DeleteAsync(string key)
         {
+            // Removal triggers the post-eviction callback above, which removes the key
+            // from _keys - no need to touch _keys directly here.
             _cache.Remove(key);
-            _keys.TryRemove(key, out _);
             return Task.FromResult(true);
         }
-    
+
+        /// <summary>
+        /// Deletes all cache entries whose keys begin with the provided prefix.
+        /// </summary>
+        /// <param name="prefix">The key prefix to match.</param>
+        /// <returns>bool based on prefix delete success</returns>
+        public Task<bool> DeleteByPrefixAsync(string prefix)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
+
+            var matchingKeys = _keys.Keys
+                .Where(key => key.StartsWith(prefix, StringComparison.Ordinal))
+                .ToArray();
+
+            foreach (var key in matchingKeys)
+            {
+                _cache.Remove(key);
+            }
+
+            return Task.FromResult(true);
+        }
+
         /// <summary>
         /// Operation to flush all existing data
         /// </summary>

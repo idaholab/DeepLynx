@@ -1,7 +1,7 @@
 // src/app/lib/relationship_services.client.ts
 
 import { CreateRelationshipRequestDto, UpdateRelationshipRequestDto } from "@/app/(home)/types/requestDTOs";
-import { RelationshipResponseDto } from "@/app/(home)/types/responseDTOs";
+import { PaginatedResponse, RelationshipResponseDto } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
 
@@ -10,16 +10,20 @@ import api from "./api";
  * Get all relationships for a project
  * @param projectId - The ID of the project
  * @param hideArchived - Flag to hide archived relationships (default: true)
- * @returns Promise with array of RelationshipResponseDto
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all relationships (default: -1)
+ * @returns Promise with paginated RelationshipResponseDto
  */
 export const getAllRelationships = async (
   projectId: number,
-  hideArchived: boolean = true
-): Promise<RelationshipResponseDto[]> => {
+  hideArchived: boolean = true,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<RelationshipResponseDto>> => {
   try {
     const { data } = await api.get(
       `/projects/${projectId}/relationships`,
-      { params: { hideArchived } }
+      { params: { hideArchived, pageNumber, pageSize } }
     );
     return data;
   } catch (error) {

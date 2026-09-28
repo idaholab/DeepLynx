@@ -333,7 +333,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
     return (
       <React.Fragment key={index}>
         <div className={`grid grid-cols-12 border-b border-base-300/50`}>
-          <div className="col-span-4 p-3 font-medium text-base-content text-sm bg-base-200 border-r border-base-300/50 flex items-center relative">
+          <div className="col-span-4 p-3 font-medium text-base-content text-sm bg-base-200 border-r border-base-300/50 flex items-start relative">
             {/* Tree branch visualization */}
             {depth > 0 && (
               <div className="absolute left-0 top-0 bottom-0 flex">
@@ -383,7 +383,12 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                   )}
                 </button>
               )}
-              <span className="truncate ml-2">{row.label}</span>
+              <span
+                className="ml-2 whitespace-normal"
+                style={{ wordBreak: "break-word" }}
+              >
+                {row.label}
+              </span>
             </div>
           </div>
           <div className="col-span-7 p-3 text-sm text-base-content break-words">

@@ -3,6 +3,7 @@ import "server-only";
 import { apiFetch, asJson } from "./api.server";
 import {
     PaginatedRecordCollectionsResponseDto,
+    PaginatedResponse,
     RecordCollectionResponseDto,
     RecordResponseDto,
 } from "@/app/(home)/types/responseDTOs";
@@ -151,11 +152,16 @@ export async function getRecordsInRecordCollectionServer(
     projectId: number,
     recordCollectionId: number,
     hideArchived = true,
-): Promise<RecordResponseDto[]> {
+    pageNumber: number = 1,
+    pageSize: number = -1
+): Promise<PaginatedResponse<RecordResponseDto>> {
+
+    var dto = {pageNumber: pageNumber, pageSize: pageSize}
+
     const path =
         `/organizations/${organizationId}/projects/${projectId}/record-collections/${recordCollectionId}/records` +
-        `?hideArchived=${hideArchived}`;
+        `?${buildRecordCollectionQueryString(dto, hideArchived)}`;
 
     const res = await apiFetch(path);
-    return asJson<RecordResponseDto[]>(res);
+    return asJson<PaginatedResponse<RecordResponseDto>>(res);
 }

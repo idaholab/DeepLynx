@@ -116,7 +116,7 @@ public class OlapBusiness : IOlapBusiness
     //     long dataSourceId,
     //     string tableName, string fileType)
     // {
-    // await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+    // await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, hideArchived: true, _logger);
     // var request = new TimeseriesQueryRequestDto
     // {
     //     Query = $"SELECT * FROM '{tableName}'"
@@ -292,13 +292,18 @@ public class OlapBusiness : IOlapBusiness
         // For a folder (appended-blob dataset) we glob all part files and union by name so
         // the schema is resolved across every part even if columns were added over time.
         // For a single file we keep the simple quoted-path form.
+        const long CsvMaxLineSize = 5000000;
+
         var fileExtension = record.FileType?.ToLower() == "csv" ? "csv" : "parquet";
-        var readFunction = fileExtension == "csv" ? "read_csv" : "read_parquet";
-        var viewSourceSql = isFolder
-            ? $"SELECT * EXCLUDE filename FROM {readFunction}(['{fileUrl.TrimEnd('/')}/*.{fileExtension}'], union_by_name = true, filename = true) ORDER BY CAST(regexp_extract(filename, '(\\d+)\\.{fileExtension}$', 1) AS BIGINT)"
-            : $"SELECT * FROM '{fileUrl}'";
 
-
+        var viewSourceSql = fileExtension == "csv"
+            ? isFolder
+                ? $"SELECT * EXCLUDE filename FROM read_csv(['{fileUrl.TrimEnd('/')}/*.csv'], union_by_name = true, filename = true, max_line_size = {CsvMaxLineSize}) ORDER BY CAST(regexp_extract(filename, '(\\d+)\\.csv$', 1) AS BIGINT)"
+                : $"SELECT * FROM read_csv('{fileUrl}', max_line_size = {CsvMaxLineSize})"
+            : isFolder
+                ? $"SELECT * EXCLUDE filename FROM read_parquet(['{fileUrl.TrimEnd('/')}/*.parquet'], union_by_name = true, filename = true) ORDER BY CAST(regexp_extract(filename, '(\\d+)\\.parquet$', 1) AS BIGINT)"
+                : $"SELECT * FROM '{fileUrl}'";
+                
         await using (connection)
         {
             if (queryOptions?.ShouldShapeView == true)
@@ -1081,6 +1086,14 @@ public class OlapBusiness : IOlapBusiness
             await using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = "INSTALL azure; LOAD azure;";
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            // The default DuckDB Azure SDK transport has trouble using our SSL certs, need to switch to curl
+            // to allow connection to our blob storage. See https://duckdb.org/docs/current/core_extensions/azure
+            await using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SET azure_transport_option_type = 'curl';";
                 await cmd.ExecuteNonQueryAsync();
             }
 

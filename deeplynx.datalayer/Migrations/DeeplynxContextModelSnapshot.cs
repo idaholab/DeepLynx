@@ -704,10 +704,9 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
 
                     b.Property<string>("Error")
-                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("error");
 
@@ -715,6 +714,10 @@ namespace deeplynx.datalayer.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("job_id");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("metadata");
 
                     b.Property<float>("Progress")
                         .HasColumnType("real")
@@ -840,13 +843,17 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("mode");
 
-                    b.Property<long?>("ProjectId")
+                    b.Property<long>("ProjectId")
                         .HasColumnType("bigint")
                         .HasColumnName("project_id");
 
                     b.Property<string>("Properties")
                         .HasColumnType("jsonb")
                         .HasColumnName("properties");
+
+                    b.Property<long?>("SourceRecordId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_record_id");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -857,6 +864,8 @@ namespace deeplynx.datalayer.Migrations
                         .HasName("extractions_pkey");
 
                     b.HasIndex("CreatedBy");
+
+                    b.HasIndex("SourceRecordId");
 
                     b.ToTable("extractions", "deeplynx");
                 });
@@ -1226,6 +1235,183 @@ namespace deeplynx.datalayer.Migrations
                     b.ToTable("oauth_applications", "deeplynx");
                 });
 
+            modelBuilder.Entity("deeplynx.datalayer.Models.OauthDeviceAuthorizationRequest", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ApplicationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("application_id");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("approved_at");
+
+                    b.Property<DateTime?>("ConsumedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<DateTime?>("DeniedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("denied_at");
+
+                    b.Property<string>("DeviceCodeHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("device_code_hash");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime?>("LastPolledAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("last_polled_at");
+
+                    b.Property<int>("PollCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("poll_count");
+
+                    b.Property<int>("PollingIntervalSeconds")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(5)
+                        .HasColumnName("polling_interval_seconds");
+
+                    b.Property<string>("Scope")
+                        .HasColumnType("text")
+                        .HasColumnName("scope");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("pending")
+                        .HasColumnName("status");
+
+                    b.Property<string>("UserCodeHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("user_code_hash");
+
+                    b.Property<long?>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("oauth_device_auth_requests_pkey");
+
+                    b.HasIndex("ApplicationId")
+                        .HasDatabaseName("idx_oauth_device_auth_application_id");
+
+                    b.HasIndex("DeviceCodeHash")
+                        .IsUnique()
+                        .HasDatabaseName("idx_oauth_device_auth_device_code_hash");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("idx_oauth_device_auth_expires_at");
+
+                    b.HasIndex("Id")
+                        .HasDatabaseName("idx_oauth_device_auth_requests_id");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("idx_oauth_device_auth_status");
+
+                    b.HasIndex("UserCodeHash")
+                        .IsUnique()
+                        .HasDatabaseName("idx_oauth_device_auth_user_code_hash");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("idx_oauth_device_auth_user_id");
+
+                    b.ToTable("oauth_device_authorization_requests", "deeplynx");
+                });
+
+            modelBuilder.Entity("deeplynx.datalayer.Models.OauthRefreshToken", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ApplicationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("application_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("last_used_at");
+
+                    b.Property<bool>("Revoked")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("revoked");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("Scope")
+                        .HasColumnType("text")
+                        .HasColumnName("scope");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("token_hash");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("oauth_refresh_tokens_pkey");
+
+                    b.HasIndex("ApplicationId")
+                        .HasDatabaseName("idx_oauth_refresh_tokens_application_id");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("idx_oauth_refresh_tokens_expires_at");
+
+                    b.HasIndex("Id")
+                        .HasDatabaseName("idx_oauth_refresh_tokens_id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("idx_oauth_refresh_tokens_token_hash");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("idx_oauth_refresh_tokens_user_id");
+
+                    b.ToTable("oauth_refresh_tokens", "deeplynx");
+                });
+
             modelBuilder.Entity("deeplynx.datalayer.Models.OauthToken", b =>
                 {
                     b.Property<long>("Id")
@@ -1293,9 +1479,11 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("config_encrypted");
 
-                    b.Property<bool>("Default")
+                    b.Property<bool>("FilesDeletable")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasColumnName("default");
+                        .HasDefaultValue(true)
+                        .HasColumnName("files_deletable");
 
                     b.Property<bool>("IsArchived")
                         .ValueGeneratedOnAdd()
@@ -1414,6 +1602,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("create_container_per_project");
 
+                    b.Property<long>("DefaultObjectStorageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("default_object_storage_id");
+
                     b.Property<bool>("DefaultOrg")
                         .HasColumnType("boolean")
                         .HasColumnName("default_org");
@@ -1441,6 +1633,10 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<long?>("LastUpdatedBy")
                         .HasColumnType("bigint")
                         .HasColumnName("last_updated_by");
+
+                    b.Property<int?>("LogoObjectStorageId")
+                        .HasColumnType("integer")
+                        .HasColumnName("logo_object_storage_id");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -1533,10 +1729,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_default");
 
-                    b.Property<long?>("LabelId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("label_id");
-
                     b.Property<DateTime>("LastUpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
@@ -1576,9 +1768,6 @@ namespace deeplynx.datalayer.Migrations
                     b.HasIndex("IsDefault")
                         .HasDatabaseName("idx_permissions_is_default");
 
-                    b.HasIndex("LabelId")
-                        .HasDatabaseName("idx_permissions_label_id");
-
                     b.HasIndex("LastUpdatedBy")
                         .HasDatabaseName("idx_permissions_last_updated_by");
 
@@ -1591,20 +1780,10 @@ namespace deeplynx.datalayer.Migrations
                     b.HasIndex("Resource")
                         .HasDatabaseName("idx_permissions_resource");
 
-                    b.HasIndex("OrganizationId", "LabelId", "Action")
-                        .IsUnique()
-                        .HasDatabaseName("permissions_unique_org_label_action")
-                        .HasFilter("project_id IS NULL");
-
                     b.HasIndex("OrganizationId", "Resource", "Action")
                         .IsUnique()
                         .HasDatabaseName("permissions_unique_org_resource_action")
                         .HasFilter("project_id IS NULL");
-
-                    b.HasIndex("OrganizationId", "ProjectId", "LabelId", "Action")
-                        .IsUnique()
-                        .HasDatabaseName("permissions_unique_project_label_action")
-                        .HasFilter("project_id IS NOT NULL");
 
                     b.HasIndex("OrganizationId", "ProjectId", "Resource", "Action")
                         .IsUnique()
@@ -1613,7 +1792,7 @@ namespace deeplynx.datalayer.Migrations
 
                     b.ToTable("permissions", "deeplynx", t =>
                         {
-                            t.HasCheckConstraint("chk_default_permissions_no_org_project_label", "is_default = false OR (organization_id IS NULL AND project_id IS NULL AND label_id IS NULL)");
+                            t.HasCheckConstraint("chk_default_permissions_no_org_project_label", "is_default = false OR (organization_id IS NULL AND project_id IS NULL)");
                         });
                 });
 
@@ -1634,6 +1813,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("banner");
+
+                    b.Property<long>("DefaultObjectStorageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("default_object_storage_id");
 
                     b.Property<string>("Description")
                         .HasColumnType("text")
@@ -1659,6 +1842,10 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<long?>("LastUpdatedBy")
                         .HasColumnType("bigint")
                         .HasColumnName("last_updated_by");
+
+                    b.Property<int?>("LogoObjectStorageId")
+                        .HasColumnType("integer")
+                        .HasColumnName("logo_object_storage_id");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -1753,6 +1940,10 @@ namespace deeplynx.datalayer.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("ChainHash")
+                        .HasColumnType("text")
+                        .HasColumnName("chain_hash");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
@@ -1770,6 +1961,10 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<long>("OrganizationId")
                         .HasColumnType("bigint")
                         .HasColumnName("organization_id");
+
+                    b.Property<string>("PreviousHash")
+                        .HasColumnType("text")
+                        .HasColumnName("previous_hash");
 
                     b.Property<long>("ProjectId")
                         .HasColumnType("bigint")
@@ -1813,6 +2008,14 @@ namespace deeplynx.datalayer.Migrations
 
                     b.HasIndex("RecordId")
                         .HasDatabaseName("idx_provenance_records_record_id");
+
+                    b.HasIndex("RecordId", "Id")
+                        .HasDatabaseName("idx_provenance_records_record_id_id");
+
+                    b.HasIndex("RecordId", "PreviousHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_provenance_records_record_id_previous_hash")
+                        .HasFilter("previous_hash IS NOT NULL");
 
                     b.ToTable("provenance_records", "deeplynx");
                 });
@@ -2405,6 +2608,99 @@ namespace deeplynx.datalayer.Migrations
                         .HasFilter("project_id IS NOT NULL");
 
                     b.ToTable("sensitivity_labels", "deeplynx");
+                });
+
+            modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabelGrant", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("GrantedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("granted_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<long?>("GrantedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("granted_by");
+
+                    b.Property<long?>("GroupId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("group_id");
+
+                    b.Property<long>("LabelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("label_id");
+
+                    b.Property<long?>("LabelPermissionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("label_permission_id");
+
+                    b.Property<long?>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("sensitivity_label_grants_pkey");
+
+                    b.HasIndex("GrantedBy");
+
+                    b.HasIndex("Id")
+                        .HasDatabaseName("idx_sensitivity_label_grants_id");
+
+                    b.HasIndex("LabelId")
+                        .HasDatabaseName("idx_sensitivity_label_grants_label_id");
+
+                    b.HasIndex("LabelPermissionId")
+                        .HasDatabaseName("idx_sensitivity_label_grants_label_permission_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("idx_sensitivity_label_grants_user_id");
+
+                    b.HasIndex("GroupId", "LabelId", "LabelPermissionId")
+                        .IsUnique()
+                        .HasDatabaseName("unique_sensitivity_label_grant_group");
+
+                    b.HasIndex("UserId", "LabelId", "LabelPermissionId")
+                        .IsUnique()
+                        .HasDatabaseName("unique_sensitivity_label_grant_user");
+
+                    b.ToTable("sensitivity_label_grants", "deeplynx", t =>
+                        {
+                            t.HasCheckConstraint("chk_sensitivity_label_grants_user_xor_group", "(user_id IS NOT NULL AND group_id IS NULL) OR (user_id IS NULL AND group_id IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabelPermissionAction", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id")
+                        .HasName("sensitivity_label_permission_actions_pkey");
+
+                    b.HasIndex("Id")
+                        .HasDatabaseName("idx_sensitivity_label_permission_actions_id");
+
+                    b.ToTable("sensitivity_label_permission_actions", "deeplynx");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Subscription", b =>
@@ -3082,7 +3378,14 @@ namespace deeplynx.datalayer.Migrations
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction);
 
+                    b.HasOne("deeplynx.datalayer.Models.Record", "SourceRecord")
+                        .WithMany()
+                        .HasForeignKey("SourceRecordId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("CreatedByUser");
+
+                    b.Navigation("SourceRecord");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Group", b =>
@@ -3179,6 +3482,47 @@ namespace deeplynx.datalayer.Migrations
                         .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("LastUpdatedByUser");
+                });
+
+            modelBuilder.Entity("deeplynx.datalayer.Models.OauthDeviceAuthorizationRequest", b =>
+                {
+                    b.HasOne("deeplynx.datalayer.Models.OauthApplication", "OauthApplication")
+                        .WithMany("OauthDeviceAuthorizationRequests")
+                        .HasForeignKey("ApplicationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("oauth_device_auth_requests_application_id_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.User", "User")
+                        .WithMany("OauthDeviceAuthorizationRequests")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("oauth_device_auth_requests_user_id_fkey");
+
+                    b.Navigation("OauthApplication");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("deeplynx.datalayer.Models.OauthRefreshToken", b =>
+                {
+                    b.HasOne("deeplynx.datalayer.Models.OauthApplication", "OauthApplication")
+                        .WithMany("OauthRefreshTokens")
+                        .HasForeignKey("ApplicationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("oauth_refresh_tokens_application_id_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.User", "User")
+                        .WithMany("OauthRefreshTokens")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("oauth_refresh_tokens_user_id_fkey");
+
+                    b.Navigation("OauthApplication");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.OauthToken", b =>
@@ -3279,12 +3623,6 @@ namespace deeplynx.datalayer.Migrations
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Permission", b =>
                 {
-                    b.HasOne("deeplynx.datalayer.Models.SensitivityLabel", "Label")
-                        .WithMany("Permissions")
-                        .HasForeignKey("LabelId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .HasConstraintName("permissions_label_id_fkey");
-
                     b.HasOne("deeplynx.datalayer.Models.User", "LastUpdatedByUser")
                         .WithMany("LastUpdatedPermissions")
                         .HasForeignKey("LastUpdatedBy")
@@ -3301,8 +3639,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("permissions_project_id_fkey");
-
-                    b.Navigation("Label");
 
                     b.Navigation("LastUpdatedByUser");
 
@@ -3364,45 +3700,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("Role");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("deeplynx.datalayer.Models.ProvenanceRecord", b =>
-                {
-                    b.HasOne("deeplynx.datalayer.Models.HistoricalRecord", "HistoricalRecord")
-                        .WithMany("ProvenanceRecords")
-                        .HasForeignKey("HistoricalRecordId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("provenance_records_historical_record_id_fkey");
-
-                    b.HasOne("deeplynx.datalayer.Models.Organization", "Organization")
-                        .WithMany("ProvenanceRecords")
-                        .HasForeignKey("OrganizationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("provenance_records_organization_id_fkey");
-
-                    b.HasOne("deeplynx.datalayer.Models.Project", "Project")
-                        .WithMany("ProvenanceRecords")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("provenance_records_project_id_fkey");
-
-                    b.HasOne("deeplynx.datalayer.Models.Record", "Record")
-                        .WithMany("ProvenanceRecords")
-                        .HasForeignKey("RecordId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("provenance_records_record_id_fkey");
-
-                    b.Navigation("HistoricalRecord");
-
-                    b.Navigation("Organization");
-
-                    b.Navigation("Project");
-
-                    b.Navigation("Record");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Record", b =>
@@ -3604,6 +3901,50 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("Project");
                 });
 
+            modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabelGrant", b =>
+                {
+                    b.HasOne("deeplynx.datalayer.Models.User", "GrantedByUser")
+                        .WithMany("GrantedSensitivityLabelGrants")
+                        .HasForeignKey("GrantedBy")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("sensitivity_label_grants_granted_by_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.Group", "Group")
+                        .WithMany("SensitivityLabelGrants")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("sensitivity_label_grants_group_id_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.SensitivityLabel", "Label")
+                        .WithMany("SensitivityLabelGrants")
+                        .HasForeignKey("LabelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("sensitivity_label_grants_label_id_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.SensitivityLabelPermissionAction", "LabelPermission")
+                        .WithMany("SensitivityLabelGrants")
+                        .HasForeignKey("LabelPermissionId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("sensitivity_label_grants_label_permission_id_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.User", "User")
+                        .WithMany("SensitivityLabelGrants")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("sensitivity_label_grants_user_id_fkey");
+
+                    b.Navigation("GrantedByUser");
+
+                    b.Navigation("Group");
+
+                    b.Navigation("Label");
+
+                    b.Navigation("LabelPermission");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("deeplynx.datalayer.Models.Subscription", b =>
                 {
                     b.HasOne("deeplynx.datalayer.Models.Action", "Action")
@@ -3746,16 +4087,17 @@ namespace deeplynx.datalayer.Migrations
             modelBuilder.Entity("deeplynx.datalayer.Models.Group", b =>
                 {
                     b.Navigation("ProjectMembers");
-                });
 
-            modelBuilder.Entity("deeplynx.datalayer.Models.HistoricalRecord", b =>
-                {
-                    b.Navigation("ProvenanceRecords");
+                    b.Navigation("SensitivityLabelGrants");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.OauthApplication", b =>
                 {
                     b.Navigation("ApiKeys");
+
+                    b.Navigation("OauthDeviceAuthorizationRequests");
+
+                    b.Navigation("OauthRefreshTokens");
 
                     b.Navigation("OauthTokens");
                 });
@@ -3792,8 +4134,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("Permissions");
 
                     b.Navigation("Projects");
-
-                    b.Navigation("ProvenanceRecords");
 
                     b.Navigation("RecordCollections");
 
@@ -3834,8 +4174,6 @@ namespace deeplynx.datalayer.Migrations
 
                     b.Navigation("ProjectMembers");
 
-                    b.Navigation("ProvenanceRecords");
-
                     b.Navigation("RecordCollections");
 
                     b.Navigation("Records");
@@ -3860,8 +4198,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("Embeddings");
 
                     b.Navigation("HistoricalRecords");
-
-                    b.Navigation("ProvenanceRecords");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Relationship", b =>
@@ -3878,7 +4214,12 @@ namespace deeplynx.datalayer.Migrations
 
             modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabel", b =>
                 {
-                    b.Navigation("Permissions");
+                    b.Navigation("SensitivityLabelGrants");
+                });
+
+            modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabelPermissionAction", b =>
+                {
+                    b.Navigation("SensitivityLabelGrants");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.User", b =>
@@ -3886,6 +4227,8 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("ApiKeys");
 
                     b.Navigation("CreatedApiKeys");
+
+                    b.Navigation("GrantedSensitivityLabelGrants");
 
                     b.Navigation("LastUpdatedActions");
 
@@ -3925,6 +4268,10 @@ namespace deeplynx.datalayer.Migrations
 
                     b.Navigation("LastUpdatedTags");
 
+                    b.Navigation("OauthDeviceAuthorizationRequests");
+
+                    b.Navigation("OauthRefreshTokens");
+
                     b.Navigation("OauthTokens");
 
                     b.Navigation("OrganizationUsers");
@@ -3932,6 +4279,8 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("ProjectMembers");
 
                     b.Navigation("SavedSearches");
+
+                    b.Navigation("SensitivityLabelGrants");
 
                     b.Navigation("Subscriptions");
 

@@ -8,6 +8,7 @@ import {
 } from "@/app/(home)/types/requestDTOs";
 import {
   ProjectResponseDto,
+  PaginatedResponse,
   ProjectStatResponseDto,
   ProjectMemberResponseDto
 } from "@/app/(home)/types/responseDTOs";
@@ -33,16 +34,20 @@ import {
  * Get all projects for an organization
  * @param organizationId - The ID of the organization
  * @param hideArchived - Flag to hide archived projects (default: true)
- * @returns Promise with array of ProjectResponseDto
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all projects (default: -1)
+ * @returns Promise with paginated ProjectResponseDto
  */
 export async function getAllProjects(
   organizationId: number,
-  hideArchived: boolean = true
-): Promise<ProjectResponseDto[]> {
+  hideArchived: boolean = true,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<ProjectResponseDto>> {
   try {
     const res = await api.get(
       `/organizations/${organizationId}/projects`,
-      { params: { hideArchived } }
+      { params: { hideArchived, pageNumber, pageSize } }
     );
     return res.data;
   } catch (error) {
@@ -326,11 +331,14 @@ export async function getProjectFileCount(
  */
 export async function getProjectMembers(
   organizationId: number,
-  projectId: number
-): Promise<ProjectMemberResponseDto[]> {
+  projectId: number,
+  pageNumber = 1,
+  pageSize = -1
+): Promise<PaginatedResponse<ProjectMemberResponseDto>> {
   try {
     const res = await api.get(
-      `/organizations/${organizationId}/projects/${projectId}/members`
+      `/organizations/${organizationId}/projects/${projectId}/members`,
+      { params: { pageNumber, pageSize } }
     );
     return res.data;
   } catch (error) {

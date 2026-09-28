@@ -37,13 +37,11 @@ namespace deeplynx.business
         /// </summary>
         /// <param name="key">The key of cached data</param>
         /// <returns>The matching Cached data </returns>
-        public async Task<T> GetAsync<T>(string key)
+        public async Task<T?> GetAsync<T>(string key)
         {
             var value = await _db.StringGetAsync(key);
             if (value.IsNullOrEmpty)
-            {
                 return default;
-            }
 
             return JsonSerializer.Deserialize<T>(value.ToString(), _jsonOptions);
         }
@@ -103,6 +101,31 @@ namespace deeplynx.business
         {
             bool removed = await _db.KeyDeleteAsync(key);
             return removed;
+        }
+
+        /// <summary>
+        /// Deletes all cache entries whose keys begin with the provided prefix.
+        /// </summary>
+        /// <param name="prefix">The key prefix to match.</param>
+        /// <returns>bool based on prefix delete success</returns>
+        public async Task<bool> DeleteByPrefixAsync(string prefix)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
+
+            var endpoints = _redis.GetEndPoints();
+            foreach (var endpoint in endpoints)
+            {
+                var server = _redis.GetServer(endpoint);
+
+                await foreach (var key in server.KeysAsync(
+                                database: _db.Database,
+                                pattern: $"{prefix}*"))
+                {
+                    await _db.KeyDeleteAsync(key);
+                }
+            }
+
+            return true;
         }
 
         /// <summary>

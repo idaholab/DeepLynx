@@ -8,6 +8,8 @@ import React, { useEffect, useState } from "react";
 import AvatarCell from "../Avatar";
 import GenericTable from "../GenericTable";
 import Link from "next/link";
+import PaginationControls from "@/app/(home)/components/PaginationControls";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
 
 const TeamMembersWidget: React.FC = () => {
   const [users, setUsers] = useState<ProjectMemberResponseDto[]>([]);
@@ -22,7 +24,7 @@ const TeamMembersWidget: React.FC = () => {
           organization?.organizationId as number,
           project?.projectId as number,
         );
-        setUsers(data);
+        setUsers(data.items);
       } catch (error) {
         console.error("Failed to fetch projects:", error);
       }
@@ -37,7 +39,8 @@ const TeamMembersWidget: React.FC = () => {
     id: user.memberId,
     name: user.name,
     email: user.email,
-    role: user.role ?? t.translations.NOT_AVAILABLE,
+    role: user.isProjectAdmin ? "Admin" : user.role ?? t.translations.NOT_AVAILABLE,
+    type: 'user'
   }));
 
   const teamMemberColumns: Column<ProjectMemberResponseDto>[] = [
@@ -68,6 +71,18 @@ const TeamMembersWidget: React.FC = () => {
     },
   ];
 
+  const {
+  currentPage,
+  pageSize,
+  paginatedItems,
+  totalPages,
+  setCurrentPage,
+  setPageSize,
+} = useLocalPagination({
+  items: teamMemberRows,
+  initialPageSize: 4,
+});
+
   return (
     <div className="card">
       <div className="card-body">
@@ -84,13 +99,19 @@ const TeamMembersWidget: React.FC = () => {
         </div>
         <GenericTable
           columns={teamMemberColumns}
-          data={teamMemberRows}
-          enablePagination
-          rowsPerPage={4}
+          data={paginatedItems}
         />
+        <div className="mt-2 flex justify-end">
+          <PaginationControls
+            currentPage={currentPage}
+            pageSize={pageSize}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
+        </div>
       </div>
     </div>
   );
-};
-
+}
 export default TeamMembersWidget;

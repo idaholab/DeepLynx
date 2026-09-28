@@ -12,17 +12,14 @@ import {
   useState,
   type ChangeEvent,
 } from "react";
-import type { ExistingFile } from "../../types/types";
 import type { ClassResponseDto } from "../../types/responseDTOs";
 import SearchBar from "../../components/SearchBar";
+import PaginationControls from "../../components/PaginationControls";
 import { formatLocalDateTime } from "@/app/lib/date_time";
 import { createMetadataUploadSchema } from "./metadataUploadSchema";
 import { getClass } from "@/app/lib/client_service/class_services.client";
+import { useRecordPicker } from "../hooks/useRecordPicker";
 
-const MAX_VISIBLE_FILES = 100;
-
-const initialVisibleFiles = (files: ExistingFile[]) =>
-  files.slice(0, MAX_VISIBLE_FILES);
 const interpolate = (
   template: string,
   values: Record<string, string | number>,
@@ -38,10 +35,9 @@ interface NewFileUploadCardProps {
   disableMetadataFile?: boolean;
   onMetadataChange: (fileIndex: number, metadata: FileMetadata) => void;
   onRemove?: () => void;
-  availableFiles: ExistingFile[];
   availableClasses: ClassResponseDto[];
   isLoadingClasses: boolean;
-  onSearchFiles: (query: string) => Promise<ExistingFile[]>;
+  organizationId: number;
   projectId: number;
   uploadError?: string;
 }
@@ -52,10 +48,9 @@ export default function NewFileUploadCard({
   disableMetadataFile = false,
   onMetadataChange,
   onRemove,
-  availableFiles,
   availableClasses,
   isLoadingClasses,
-  onSearchFiles,
+  organizationId,
   projectId,
   uploadError,
 }: NewFileUploadCardProps) {
@@ -76,9 +71,8 @@ export default function NewFileUploadCard({
   );
   const [recordMode, setRecordMode] = useState<"new" | "update">("new");
   const [targetRecordId, setTargetRecordId] = useState("");
+  const [selectedRecordLabel, setSelectedRecordLabel] = useState("");
   const [recordSearchInput, setRecordSearchInput] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
   const [metadataFile, setMetadataFile] = useState<File | undefined>(undefined);
   const [metadataPreview, setMetadataPreview] = useState<
     Record<string, unknown> | undefined
@@ -86,8 +80,10 @@ export default function NewFileUploadCard({
   const [metadataPreviewError, setMetadataPreviewError] = useState("");
   const [showClassIdHelp, setShowClassIdHelp] = useState(false);
   const metadataFileInputRef = useRef<HTMLInputElement | null>(null);
-  const [displayedFiles, setDisplayedFiles] = useState<ExistingFile[]>(
-    initialVisibleFiles(availableFiles),
+  const picker = useRecordPicker(
+    organizationId,
+    projectId,
+    recordMode === "update",
   );
   const metadataInputId = `metadata-file-${fileIndex}`;
   const metadataHelpId = `metadata-file-help-${fileIndex}`;
@@ -112,6 +108,12 @@ export default function NewFileUploadCard({
     if (value === undefined || value === null) return undefined;
     if (typeof value === "string") return value.trim() || undefined;
     if (typeof value === "number") return String(value);
+    if (Array.isArray(value)) {
+      const joined = value
+        .filter((item): item is string => typeof item === "string")
+        .join(", ");
+      return joined || undefined;
+    }
     return undefined;
   };
 
@@ -174,55 +176,34 @@ export default function NewFileUploadCard({
     }
   };
 
-  const selectedRecord =
-    displayedFiles.find((f) => String(f.id) === String(targetRecordId)) ??
-    availableFiles.find((f) => String(f.id) === String(targetRecordId));
+  const handleSelectRecord = useCallback((id: string, name: string) => {
+    setTargetRecordId(id);
+    setSelectedRecordLabel(name);
+  }, []);
 
-  const handleSearch = useCallback(
-    async ({ query }: { query: string; option?: string }) => {
-      const trimmedQuery = query.trim();
-
-      if (!trimmedQuery) {
-        setHasSearched(false);
-        setDisplayedFiles(initialVisibleFiles(availableFiles));
-        return;
-      }
-
-      setHasSearched(true);
-      setIsSearching(true);
-      try {
-        const results = await onSearchFiles(trimmedQuery);
-        setDisplayedFiles(results);
-      } finally {
-        setIsSearching(false);
-      }
+  const handleSearchSubmit = useCallback(
+    ({ query }: { query: string; option?: string }) => {
+      picker.setSearchQuery(query.trim());
     },
-    [availableFiles, onSearchFiles],
+    [picker.setSearchQuery],
   );
+
+  const handleClearSearch = useCallback(() => {
+    setRecordSearchInput("");
+    picker.setSearchQuery("");
+  }, [picker.setSearchQuery]);
 
   useEffect(() => {
     if (recordMode !== "update") {
       setRecordSearchInput("");
-      setHasSearched(false);
-      setDisplayedFiles(initialVisibleFiles(availableFiles));
+      picker.setSearchQuery("");
     }
-  }, [recordMode, availableFiles]);
+  }, [recordMode, picker.setSearchQuery]);
 
   useEffect(() => {
-    if (!hasSearched) {
-      setDisplayedFiles(initialVisibleFiles(availableFiles));
-    }
-  }, [availableFiles, hasSearched]);
-
-  useEffect(() => {
-    if (
-      recordMode === "update" &&
-      targetRecordId &&
-      !availableFiles.some((f) => String(f.id) === String(targetRecordId))
-    ) {
-      setTargetRecordId("");
-    }
-  }, [recordMode, targetRecordId, availableFiles]);
+    setTargetRecordId("");
+    setSelectedRecordLabel("");
+  }, [projectId]);
 
   useEffect(() => {
     if (disableMetadataFile && metadataFile) {
@@ -269,10 +250,11 @@ export default function NewFileUploadCard({
                 type="button"
                 role="radio"
                 aria-checked={recordMode === "new"}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${recordMode === "new"
-                  ? "bg-base-100 text-base-content shadow-sm"
-                  : "text-base-content/70"
-                  }`}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  recordMode === "new"
+                    ? "bg-base-100 text-base-content shadow-sm"
+                    : "text-base-content/70"
+                }`}
                 onClick={() => setRecordMode("new")}
               >
                 {t.translations.NEW_RECORD}
@@ -281,10 +263,11 @@ export default function NewFileUploadCard({
                 type="button"
                 role="radio"
                 aria-checked={recordMode === "update"}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${recordMode === "update"
-                  ? "bg-base-100 text-base-content shadow-sm"
-                  : "text-base-content/70"
-                  }`}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  recordMode === "update"
+                    ? "bg-base-100 text-base-content shadow-sm"
+                    : "text-base-content/70"
+                }`}
                 onClick={() => setRecordMode("update")}
               >
                 {t.translations.UPDATE_EXISTING_RECORD}
@@ -312,37 +295,34 @@ export default function NewFileUploadCard({
                 placeholder={t.translations.SEARCH_FILES_PLACEHOLDER}
                 value={recordSearchInput}
                 onChange={(e) => setRecordSearchInput(e.target.value)}
-                onSubmit={handleSearch}
-                onClearAll={() => {
-                  setRecordSearchInput("");
-                  setHasSearched(false);
-                  setDisplayedFiles(initialVisibleFiles(availableFiles));
-                }}
+                onSubmit={handleSearchSubmit}
+                onClearAll={handleClearSearch}
                 aditionalFilters={false}
               />
 
               <div className="rounded-lg border border-base-300/50 max-h-40 overflow-y-auto">
-                {isSearching ? (
+                {picker.isLoading ? (
                   <div className="p-3 text-sm text-base-content/70">
                     <span className="loading loading-spinner loading-xs mr-2"></span>
                     {t.translations.SEARCHING_FILES}
                   </div>
-                ) : displayedFiles.length === 0 ? (
+                ) : picker.records.length === 0 ? (
                   <div className="p-3 text-sm text-base-content/70">
-                    {hasSearched
+                    {picker.searchQuery.trim()
                       ? t.translations.NO_FILES_FOUND
                       : t.translations.NO_FILES_AVAILABLE}
                   </div>
                 ) : (
-                  displayedFiles.map((f) => {
+                  picker.records.map((f) => {
                     const selected = String(targetRecordId) === String(f.id);
                     return (
                       <button
                         key={f.id}
                         type="button"
-                        onClick={() => setTargetRecordId(String(f.id))}
-                        className={`w-full border-b border-base-300/50 px-3 py-2 text-left last:border-b-0 transition ${selected ? "bg-base-200/70" : "hover:bg-base-200/30"
-                          }`}
+                        onClick={() => handleSelectRecord(String(f.id), f.name)}
+                        className={`w-full border-b border-base-300/50 px-3 py-2 text-left last:border-b-0 transition ${
+                          selected ? "bg-base-200/70" : "hover:bg-base-200/30"
+                        }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="min-w-0">
@@ -370,18 +350,20 @@ export default function NewFileUploadCard({
                 )}
               </div>
 
-              {!hasSearched && availableFiles.length > MAX_VISIBLE_FILES && (
-                <p className="text-xs text-base-content/60">
-                  {interpolate(t.translations.SHOWING_FIRST_FILES_USE_SEARCH, {
-                    count: MAX_VISIBLE_FILES,
-                  })}
-                </p>
+              {picker.totalCount > 0 && (
+                <PaginationControls
+                  currentPage={picker.currentPage}
+                  pageSize={picker.pageSize}
+                  totalPages={picker.totalPages}
+                  onPageChange={picker.setCurrentPage}
+                  onPageSizeChange={picker.setPageSize}
+                />
               )}
 
-              {selectedRecord && (
+              {selectedRecordLabel && (
                 <p className="text-xs text-base-content/70">
                   {t.translations.SELECTED_RECORD}{" "}
-                  <span className="font-semibold">{selectedRecord.name}</span>
+                  <span className="font-semibold">{selectedRecordLabel}</span>
                 </p>
               )}
             </div>
@@ -494,6 +476,18 @@ export default function NewFileUploadCard({
                             metadataPreview,
                             "ClassId",
                             "classId",
+                          ) ?? t.translations.NOT_AVAILABLE}
+                        </span>
+                      </p>
+                      <p className="break-words">
+                        <span className="font-semibold">
+                          {t.translations.METADATA_PREVIEW_TAGS}:
+                        </span>{" "}
+                        <span className="break-all">
+                          {getPreviewString(
+                            metadataPreview,
+                            "Tags",
+                            "tags",
                           ) ?? t.translations.NOT_AVAILABLE}
                         </span>
                       </p>

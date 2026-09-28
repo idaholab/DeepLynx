@@ -7,8 +7,8 @@
 
 ## Prerequisites
 
-1. Postgres download:
-   - Download [PostgreSQL](https://www.postgresql.org/) natively, OR
+1. Postgres with the pgvector extension available:
+   - Install [PostgreSQL](https://www.postgresql.org/) and [pgvector](https://github.com/pgvector/pgvector) natively, OR
    - Download [Docker](https://docs.docker.com/engine/install/)
 
 2. .NET SDK: Ensure .NET SDK version 10.0 is installed on your system. Download [.NET 10.0](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). You can verify you are using the correct version by running `dotnet --version` in the command line.
@@ -26,6 +26,31 @@ Built containers must always be rebuilt after code changes, including pulled cod
 ```
 docker compose up --build
 ```
+
+### Selecting the UI API Version
+
+Docker Compose reads `NEXT_PUBLIC_API_VERSION` from the shell or the root
+`.env` file and uses `v2` when it is not set. For example:
+
+```dotenv
+NEXT_PUBLIC_API_VERSION=v2
+```
+
+To reuse the UI's `deeplynx.UI/.env.local` file instead, pass it explicitly:
+
+```bash
+docker compose --env-file deeplynx.UI/.env.local up --build
+```
+
+`NEXT_PUBLIC_*` values are compiled into the Next.js browser bundle, so the UI
+image must be rebuilt after changing the version. Developer `.env.*` files are
+excluded from the Docker build context to prevent local URLs and secrets from
+being copied into an image; Compose passes the selected version as a build
+argument instead.
+
+The deployed Dev UI does not use local env files. Its API URL and version come
+from the GitHub Development environment variables used by the image-build
+workflow.
 
 ### Running with DeepLynx Insight
 
@@ -49,7 +74,7 @@ The Insight services connect to the same `nx-postgres` container as the rest of 
 
 The values need to point at the same database. If you change the credentials, make sure both sets match in `docker-compose.yaml`:
 
-| Setting  | Nexus (`server`, `nx-postgres`, `db-version-check`) | Insight (`insight-fastapi`, `insight-rabbitmq-runner`) |
+| Setting  | Nexus (`server`, `nx-postgres`) | Insight (`insight-fastapi`, `insight-worker-*`) |
 | -------- | --------------------------------------------------- | ------------------------------------------------------ |
 | Host     | `POSTGRES_DB_HOST`                                  | `PG_HOST`                                              |
 | Port     | `POSTGRES_PORT`                                     | `PG_PORT`                                              |
@@ -59,17 +84,13 @@ The values need to point at the same database. If you change the credentials, ma
 
 ### Developing Insight
 
-The default env file used by `insight-fastapi` and `insight-rabbitmq-runner` in `docker-compose.yaml` is `.env.production`, which has no model endpoints configured. If you are actively developing Insight and want default model endpoints wired in (which for production is not needed as Nexus will be configured to pass that information to Insight when Insights endpoints are called), swap the `env_file` for those two services in `docker-compose.yaml` to point at one of the development env files instead:
+`insight-rabbitmq`, `insight-fastapi`, and every `insight-worker-*` service in `docker-compose.yaml` read their config from a single `./deeplynx.insight/.env` file. Copy `deeplynx.insight/.env.example` to `deeplynx.insight/.env` to get started:
 
-- `./deeplynx.insight/.env.hpc.local` -- for HPC-hosted models via the INL API
-- `./deeplynx.insight/.env.ollama.local` -- for local models running via Ollama
-
-```yaml
-env_file:
-  - ./deeplynx.insight/.env.hpc.local
+```bash
+cp deeplynx.insight/.env.example deeplynx.insight/.env
 ```
 
-If you are using `.env.hpc.local`, make sure to fill in the auth tokens for the services you want to use as defaults (`LLM_AUTH_TOKEN`, `MM_AUTH_TOKEN`, `EMB_AUTH_TOKEN`). Those are left blank intentionally and the services will not authenticate without them.
+`.env.example` already ships with default HPC-hosted model endpoints filled in (`LLM_SERVER_URL`, `MM_SERVER_URL`, `EMB_SERVER_URL`, etc.) for local development convenience. Fill in the auth tokens for the services you want to use as defaults (`LLM_AUTH_TOKEN`, `MM_AUTH_TOKEN`, `EMB_AUTH_TOKEN`) — those are left blank intentionally and the services will not authenticate without them. In production these are not needed, since Nexus is configured to pass model configuration directly in API requests to Insight.
 
 ## Local Developmental Setup
 
@@ -85,7 +106,8 @@ Once you have a `.env` file, be sure to periodically check `.env_sample` for upd
 1. PostgreSQL Setup:
    - Native Install:
      - Install and launch PostgreSQL.
-     - Create a PostgreSQL server.
+     - Install pgvector on the PostgreSQL server. Nexus enables the `vector` extension in the configured database during startup.
+     - Create the configured database (`deeplynx` by default).
    - Postgres on Docker:
      - Run the following commands:
 

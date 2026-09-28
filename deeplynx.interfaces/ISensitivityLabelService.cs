@@ -30,5 +30,8 @@ public interface ISensitivityLabelService
         long organizationId,
         long projectId,
         ICollection<long> candidateIds,
-        DeeplynxContext context);
+        DeeplynxContext context,
+        bool isAdmin = false);
+
+    Task InvalidateAuthorizedLabelsCache(long labelId, long? userId = null);
 }

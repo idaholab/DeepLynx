@@ -1,7 +1,7 @@
 'use client';
 
 import api from './api';
-import { TagResponseDto } from '../../(home)/types/responseDTOs';
+import { PaginatedResponse, TagResponseDto } from '../../(home)/types/responseDTOs';
 import { CreateTagRequestDto, UpdateTagRequestDto } from '../../(home)/types/requestDTOs';
 
 // ============================================================================
@@ -12,16 +12,20 @@ import { CreateTagRequestDto, UpdateTagRequestDto } from '../../(home)/types/req
  * Get all tags for a project
  * @param projectId - The ID of the project
  * @param hideArchived - Flag to hide archived tags (default: true)
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all classes (default: -1)
  * @returns Promise with array of TagResponseDto
  */
 export const getAllTags = async (
   projectId: number,
-  hideArchived: boolean = true
-): Promise<TagResponseDto[]> => {
+  hideArchived: boolean = true,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<TagResponseDto>> => {
   try {
     const res = await api.get(
       `/projects/${projectId}/tags`,
-      { params: { hideArchived } }
+      { params: { hideArchived, pageNumber, pageSize } }
     );
     return res.data;
   } catch (error) {
@@ -177,18 +181,23 @@ export const archiveTag = async (
  * @param organizationId - The ID of the organization
  * @param projectIds - Optional array of project IDs to filter by
  * @param hideArchived - Flag to hide archived tags (default: true)
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all classes (default: -1)
  * @returns Promise with array of TagResponseDto
  */
 export const getAllTagsOrg = async (
   organizationId: number,
   projectIds?: number[],
-  hideArchived: boolean = true
-): Promise<TagResponseDto[]> => {
+  hideArchived: boolean = true,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<TagResponseDto>> => {
   try {
-    const projectIdsQuery = projectIds?.map(id => `projectIds=${id}`).join('&') ?? '';
+    const projectIdsQuery = projectIds?.map(id => `projects=${id}`).join('&') ?? '';
     const separator = projectIdsQuery ? '&' : '';
     const res = await api.get(
-        `/organizations/${organizationId}/tags?${projectIdsQuery}${separator}hideArchived=${hideArchived}`
+      `/organizations/${organizationId}/tags?${projectIdsQuery}${separator}hideArchived=${hideArchived}`,
+      { params: { pageNumber, pageSize } }
     );
     return res.data;
   } catch (error) {

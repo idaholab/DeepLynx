@@ -92,6 +92,7 @@ export type RecordResponseDto = {
   dataSourceId?: number | null;
   dataSourceName?: string | null;
   projectId?: number | null;
+  extractionId?: number | null;
   lastUpdatedAt?: string;
   lastUpdatedBy?: string | null;
   isArchived?: boolean;
@@ -99,7 +100,7 @@ export type RecordResponseDto = {
   fileSize?: number | null;
   fileContentHash?: string | null;
   tags?: { id: number | null; name: string }[];
-  labels?: { id: number | null; name: string }[];
+  sensitivityLabels?: { id: number | null; name: string }[];
 };
 
 export type PaginatedResponse<T> = {
@@ -134,7 +135,7 @@ export type RecordCollectionResponseDto = {
   isArchived: boolean;
   recordCount: number;
   tags?: RecordCollectionTagDto[];
-  labels?: RecordCollectionLabelDto[];
+  sensitivityLabels?: RecordCollectionLabelDto[];
 };
 
 export type PaginatedRecordCollectionsResponseDto =
@@ -174,6 +175,7 @@ export type ObjectStorageResponseDto = {
   lastUpdatedAt: string;
   lastUpdatedBy: string;
   isArchived: boolean;
+  filesDeletable: boolean;
 };
 
 export type OrganizationResponseDto = {
@@ -189,6 +191,7 @@ export type OrganizationResponseDto = {
   theme?: string;
   createContainerPerProject: boolean;
   disableFileTransfer?: boolean;
+  defaultObjectStorageId?: number
 };
 
 export type PermissionResponseDto = {
@@ -198,7 +201,6 @@ export type PermissionResponseDto = {
   action: string;
   resource?: string | null;
   isDefault: boolean;
-  labelId?: number | string;
   lastUpdatedAt?: Date;
   lastUpdatedBy?: string | null;
   isArchived: boolean;
@@ -226,6 +228,7 @@ export type ProjectResponseDto = {
   isArchived: boolean;
   organizationId: number | string;
   banner?: string;
+  defaultObjectStorageId?: number | null;
 };
 
 export type ProjectStatResponseDto = {
@@ -266,6 +269,85 @@ export type SensitivityLabelsDto = {
   organizationId: number | null;
 };
 
+export type SensitivityLabelGrantResponseDto = {
+  id: number;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  labelId: number;
+  grantedBy: number | null;
+  grantedByName: string | null;
+  grantedAt: string;
+};
+
+export type SensitivityLabelMemberAccessDto = {
+  userId: number | null;
+  userName: string | null;
+  userEmail: string | null;
+  groupId: number | null;
+  groupName: string | null;
+  groupMembers: {
+    userId: number;
+    userName: string;
+    userEmail: string;
+  }[] | null;
+  permissions: {
+    grantId: number;
+    labelPermissionId: number | null;
+    labelPermissionName: string | null;
+    labelPermissionDescription: string | null;
+    grantedAt: string;
+    grantedBy: number | null;
+  }[];
+};
+
+export type SensitivityLabelPermissionFlagDto = {
+  permissionId: number;
+  permissionName: string;
+  hasPermission: boolean;
+};
+
+export type SensitivityLabelGroupPermissionFlagsDto = {
+  groupId: number;
+  groupName: string;
+  permissions: SensitivityLabelPermissionFlagDto[];
+};
+
+export type SensitivityLabelUserAccessDto = {
+  userId: number;
+  labelId: number;
+  totalPermissions: SensitivityLabelPermissionFlagDto[];
+  userPermissions: SensitivityLabelPermissionFlagDto[];
+  groupPermissions: SensitivityLabelGroupPermissionFlagsDto[];
+};
+
+export type SensitivityLabelPermissionActionResponseDto = {
+  id: number;
+  name: string;
+  description: string | null;
+};
+
+export type GroupSensitivityLabelResponseDto = {
+  id: number;
+  groupId: number;
+  groupName: string;
+  labelId: number;
+  grantedBy: number | null;
+  grantedByName: string | null;
+  grantedAt: string;
+};
+
+export type SensitivityLabelPermissionResponseDto = {
+  id: number;
+  labelId: number;
+  action: string;
+  name: string;
+  description: string | null;
+  lastUpdatedAt: string;
+  lastUpdatedBy: number | null;
+  isArchived: boolean;
+};
+
 export type UserResponseDto = {
   id: number;
   name: string;
@@ -277,6 +359,7 @@ export type UserResponseDto = {
   isActive: boolean;
   lastLogin?: string | null;
   role?: string;
+  type: "user";
 };
 
 export type UserActivityCountsDto = {
@@ -344,6 +427,15 @@ export type OauthApplicationSecureResponseDto = {
   clientSecretRaw: string;
 };
 
+export type DeviceVerificationLookupResponseDto = {
+  user_code: string;
+  client_id: string;
+  application_name: string;
+  scope?: string | null;
+  expires_at: string;
+  status: string;
+};
+
 export type PaginatedEventsResponseDto = PaginatedResponse<EventResponseDto>;
 
 export type EventResponseDto = {
@@ -395,6 +487,7 @@ export type ProjectMemberResponseDto = {
   email: string;
   role?: string;
   roleId?: number;
+  type: string;
   isProjectAdmin?: boolean;
 };
 

@@ -2,17 +2,17 @@
 "use client";
 
 import AvatarCell from "@/app/(home)/components/Avatar";
+import PaginationControls from "@/app/(home)/components/PaginationControls";
 import { RoleGate } from "@/app/(home)/rbac/RBACComponents";
 import { CreateOrganizationRequestDto } from "@/app/(home)/types/requestDTOs";
-import { OrganizationResponseDto } from "@/app/(home)/types/responseDTOs";
+import { OrganizationResponseDto, UserResponseDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
 import {
   createOrganization,
-  getAllOrganizationsForUser,
 } from "@/app/lib/client_service/organization_services.client";
 import { getAllProjects } from "@/app/lib/client_service/projects_services.client";
-import { getAllUsers } from "@/app/lib/client_service/user_services.client";
 import {
   ArrowRightIcon,
   Cog6ToothIcon,
@@ -31,18 +31,75 @@ interface OrgWithCounts extends OrganizationResponseDto {
 
 interface Props {
   session: Session;
+  organizations: OrganizationResponseDto[];
+  initialUsersByOrg: Record<number, UserResponseDto[]>;
 }
 
-const SelectOrgClient = ({ session }: Props) => {
+const SelectOrgClient = ({ session, organizations, initialUsersByOrg }: Props) => {
+
   const router = useRouter();
   const { t } = useLanguage();
   const { setOrganization } = useOrganizationSession();
-  const [organizations, setOrganizations] = useState<OrgWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [orgsWithCounts, setOrgsWithCounts] = useState<OrgWithCounts[]>([]);
+
+  const {
+    currentPage: organizationPage,
+    pageSize: organizationPageSize,
+    paginatedItems: paginatedOrganizations,
+    resetPagination: resetOrganizationPagination,
+    setCurrentPage: setOrganizationPage,
+    setPageSize: setOrganizationPageSize,
+    totalPages: organizationTotalPages,
+  } = useLocalPagination({
+    items: orgsWithCounts,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+    resetOrganizationPagination();
+  }, [resetOrganizationPagination]);
+
+  useEffect(() => {
+    async function fetchProjectCounts() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const orgsWithProjectCounts = await Promise.all(
+          organizations.map(async (org) => {
+            try {
+              const { items: projects } = await getAllProjects(org.id as number, true);
+              return {
+                ...org,
+                projectCount: projects.length,
+                userCount: initialUsersByOrg[Number(org.id)]?.length || 0,
+              };
+            } catch (innerError) {
+              console.error(`Error fetching projects for org ${org.id}`, innerError);
+              return {
+                ...org,
+                projectCount: 0,
+                userCount: initialUsersByOrg[Number(org.id)]?.length || 0,
+              };
+            }
+          })
+        );
+
+        setOrgsWithCounts(orgsWithProjectCounts);
+      } catch (error) {
+        console.error("Failed to fetch project counts:", error);
+        setError(t.translations.FAILED_TO_LOAD_ORGANIZATIONS_TRY_AGAIN);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProjectCounts();
+  }, [organizations, initialUsersByOrg, t]);
 
   // Form state
   const [formData, setFormData] = useState<CreateOrganizationRequestDto>({
@@ -50,51 +107,6 @@ const SelectOrgClient = ({ session }: Props) => {
     description: "",
     disableFileTransfer: false,
   });
-
-  useEffect(() => {
-    fetchOrganizationsWithCounts();
-  }, []);
-
-  const fetchOrganizationsWithCounts = async () => {
-    try {
-      setLoading(true);
-
-      // Fetch all organizations
-      const orgs = await getAllOrganizationsForUser(true);
-
-      // Fetch project and user counts for each organization
-      const orgsWithCounts = await Promise.all(
-        orgs.map(async (org) => {
-          try {
-            const [projects, users] = await Promise.all([
-              getAllProjects(org.id as number, true),
-              getAllUsers(org.id),
-            ]);
-
-            return {
-              ...org,
-              projectCount: projects.length,
-              userCount: users.length,
-            };
-          } catch (err) {
-            console.error(`Failed to fetch data for org ${org.id}:`, err);
-            return {
-              ...org,
-              projectCount: 0,
-              userCount: 0,
-            };
-          }
-        }),
-      );
-
-      setOrganizations(orgsWithCounts);
-    } catch (err) {
-      console.error("Failed to fetch organizations:", err);
-      setError(t.translations.FAILED_TO_LOAD_ORGANIZATIONS_TRY_AGAIN);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleCreateOrganization = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,8 +120,7 @@ const SelectOrgClient = ({ session }: Props) => {
       setFormData({ name: "", description: "", disableFileTransfer: false });
       setIsModalOpen(false);
 
-      // Refresh the organizations list
-      await fetchOrganizationsWithCounts();
+      router.refresh();
     } catch (err) {
       console.error("Failed to create organization:", err);
       setCreateError(t.translations.FAILED_TO_CREATE_ORGANIZATION_TRY_AGAIN);
@@ -191,69 +202,71 @@ const SelectOrgClient = ({ session }: Props) => {
 
               {/* Organization List */}
               <div className="space-y-3 mt-4">
-                {organizations.length === 0 ? (
+                {orgsWithCounts.length === 0 ? (
                   <div className="text-center py-8 text-base-content/70">
                     <p>{t.translations.NO_ORGANIZATIONS_FOUND}</p>
                     <p className="text-sm mt-2">
-                      {
-                        t.translations
-                          .CREATE_FIRST_ORGANIZATION_TO_GET_STARTED
-                      }
+                      {t.translations.CREATE_FIRST_ORGANIZATION_TO_GET_STARTED}
                     </p>
                   </div>
                 ) : (
-                  organizations.map((org) => (
-                    <div
-                      key={org.id}
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 hover:bg-base-200 rounded-lg transition-colors"
-                    >
-                      {/* Left side - Logo and info */}
-                      <div className="flex items-start sm:items-center gap-4">
-                        <AvatarCell name={org.name} />
-                        <div className="min-w-0">
-                          <h3 className="font-semibold text-lg text-base-content break-words">
-                            {org.name}
-                          </h3>
-                          {org.description && (
-                            <p className="text-xs text-base-content/50 mt-1">
-                              {org.description}
+                  <>
+                    {/* Paginated Organizations */}
+                    {paginatedOrganizations.map((org) => (
+                      <div
+                        key={org.id}
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 hover:bg-base-200 rounded-lg transition-colors"
+                      >
+                        <div className="flex items-start sm:items-center gap-4">
+                          <AvatarCell name={org.name} />
+                          <div className="min-w-0">
+                            <h3 className="font-semibold text-lg text-base-content break-words">
+                              {org.name}
+                            </h3>
+                            {org.description && (
+                              <p className="text-xs text-base-content/50 mt-1">
+                                {org.description}
+                              </p>
+                            )}
+                            <p className="text-sm text-base-content/70 mt-1">
+                              <span className="font-semibold">{org.projectCount}</span>{" "}
+                              {org.projectCount === 1
+                                ? t.translations.PROJECT
+                                : t.translations.PROJECTS}
+                              {" • "}
+                              <span className="font-semibold">{org.userCount}</span>{" "}
+                              {org.userCount === 1
+                                ? t.translations.MEMBER
+                                : t.translations.MEMBERS}
                             </p>
-                          )}
-                          <p className="text-sm text-base-content/70 mt-1">
-                            <span className="font-semibold">
-                              {org.projectCount}
-                            </span>{" "}
-                            {org.projectCount === 1
-                              ? t.translations.PROJECT
-                              : t.translations.PROJECTS}
-                            {" • "}
-                            <span className="font-semibold">
-                              {org.userCount}
-                            </span>{" "}
-                            {org.userCount === 1
-                              ? t.translations.MEMBER
-                              : t.translations.MEMBERS}
-                          </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 self-start sm:self-auto">
+                          <RoleGate role="sysAdmin">
+                            <button className="btn btn-ghost btn-sm btn-circle">
+                              <Cog6ToothIcon className="size-6" />
+                            </button>
+                          </RoleGate>
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={() => handleLaunchOrganization(org)}
+                          >
+                            {t.translations.LAUNCH}
+                            <ArrowRightIcon className="size-5" />
+                          </button>
                         </div>
                       </div>
+                    ))}
 
-                      {/* Right side - Actions */}
-                      <div className="flex items-center gap-2 self-start sm:self-auto">
-                        <RoleGate role="sysAdmin">
-                          <button className="btn btn-ghost btn-sm btn-circle">
-                            <Cog6ToothIcon className="size-6" />
-                          </button>
-                        </RoleGate>
-                        <button
-                          className="btn btn-primary btn-sm"
-                          onClick={() => handleLaunchOrganization(org)}
-                        >
-                          {t.translations.LAUNCH}
-                          <ArrowRightIcon className="size-5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))
+                    {/* Pagination Controls */}
+                    <PaginationControls
+                      currentPage={organizationPage}
+                      pageSize={organizationPageSize}
+                      totalPages={organizationTotalPages}
+                      onPageChange={setOrganizationPage}
+                      onPageSizeChange={setOrganizationPageSize}
+                    />
+                  </>
                 )}
               </div>
             </div>
