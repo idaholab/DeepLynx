@@ -62,6 +62,10 @@ jobs:
     name: "meta"
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-slim
+    permissions:
+      contents: read
+      # To look up existing tags
+      packages: read
     outputs:
       sha: ${{ steps.meta.outputs.sha }}
       prefix: ${{ steps.meta.outputs.prefix }}
@@ -87,6 +91,43 @@ jobs:
             echo "sha=$(git rev-parse HEAD)"
             echo "prefix=ghcr.io/${GITHUB_REPOSITORY,,}"
           } >> "$GITHUB_OUTPUT"
+      - name: Check the tag is new
+        env:
+          PREFIX: ${{ steps.meta.outputs.prefix }}
+          TAG: ${{ inputs.tag }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Stop before building anything if any image already has this tag,
+          # so a published tag is never overwritten. Signed in, because
+          # ghcr.io answers 403 for a private or missing package otherwise.
+          # Keep the names in sync with the image jobs below
+          existing=()
+          for name in server ui mcp docs; do
+            ref="$PREFIX/deeplynx-$name:$TAG"
+            path="${PREFIX#ghcr.io/}/deeplynx-$name"
+            token=$(curl -sS -u "$GITHUB_ACTOR:$GITHUB_TOKEN" \
+              "https://ghcr.io/token?scope=repository:$path:pull" \
+              | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+            status=$(curl -sS -o /dev/null -w '%{http_code}' --head \
+              -H "Authorization: Bearer $token" \
+              -H "Accept: application/vnd.oci.image.index.v1+json" \
+              -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
+              "https://ghcr.io/v2/$path/manifests/$TAG")
+            case "$status" in
+              200) existing+=("$ref") ;;
+              404) echo "$ref is new" ;;
+              *)
+                echo "::error::Unexpected HTTP $status looking up $ref"
+                exit 1
+                ;;
+            esac
+          done
+          if [ "${#existing[@]}" -ne 0 ]; then
+            for ref in "${existing[@]}"; do
+              echo "::error::$ref already exists"
+            done
+            exit 1
+          fi
 
   server:
     name: "server ${{ inputs.tag }}"

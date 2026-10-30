@@ -14,6 +14,10 @@ gh workflow run build-images.yml --ref build-images -f ref=0.8.0 -f tag=0.8.0
 - `tag`: the image tag, such as the release version
 - `repository`: where `ref` comes from, `idaholab/DeepLynx` by default
 
+The run stops before building anything if any of the images already has
+`tag`, so a published tag is never overwritten. To rebuild a tag, delete it
+from every image that has it first.
+
 The workflow isn't on the default branch, so it doesn't show in the Actions
 tab's "Run workflow" list; run it with `gh` as above.
 
