@@ -4,7 +4,7 @@ run-name: "Build images ${{ inputs.tag }} from ${{ inputs.ref }}"
 # Builds the DeepLynx server, ui, mcp and docs images from a commit of this
 # repository and pushes them to ghcr.io/<owner>/deeplynx/deeplynx-<image>:<tag>.
 #
-#   gh workflow run build-images.yml --ref build-images -f ref=0.8.0 -f tag=0.8.0
+#   gh workflow run build-images.yml --ref build-images -f ref=0.8.0 -f tag=v0.8.0
 #
 # The source is idaholab/DeepLynx by default, which has the release tags; the
 # images are published under the repository running this workflow.
@@ -24,7 +24,7 @@ on:
         type: string
         default: idaholab/DeepLynx
       tag:
-        description: Image tag, such as the DeepLynx release (0.8.0)
+        description: Image tag, such as v and the DeepLynx release (v0.8.0)
         required: true
         type: string
       api-url:

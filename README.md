@@ -7,11 +7,11 @@ mirrors the internal repository.
 ## Building
 
 ```
-gh workflow run build-images.yml --ref build-images -f ref=0.8.0 -f tag=0.8.0
+gh workflow run build-images.yml --ref build-images -f ref=0.8.0 -f tag=v0.8.0
 ```
 
 - `ref`: the DeepLynx commit, tag or branch to build
-- `tag`: the image tag, such as the release version
+- `tag`: the image tag, `v` and the release version (`v0.8.0`)
 - `repository`: where `ref` comes from, `idaholab/DeepLynx` by default
 
 The run stops before building anything if any of the images already has
