@@ -1,0 +1,160 @@
+name: build-image
+
+# Builds one image for amd64 and arm64, pushes each by digest, and merges the
+# digests into a single multi-arch tag. Called by build-images.yml once per image.
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: Short name, unique within the run (keys the digest artifacts)
+        required: true
+        type: string
+      image:
+        description: Full image name, without the tag
+        required: true
+        type: string
+      tag:
+        required: true
+        type: string
+      repository:
+        description: DeepLynx repository to check out
+        required: true
+        type: string
+      sha:
+        description: Commit to build
+        required: true
+        type: string
+      file:
+        required: true
+        type: string
+      build-args:
+        required: false
+        type: string
+        default: ""
+      dotenv-path:
+        description: File to write into the checkout before building, for Next.js build-time settings
+        required: false
+        type: string
+        default: ""
+      dotenv:
+        description: Contents of dotenv-path
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: "build ${{ matrix.platform }}"
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: amd64
+            runner: ubuntu-26.04
+          - platform: arm64
+            runner: ubuntu-26.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.sha }}
+          # deeplynx.insight is an internal submodule and isn't built here
+          submodules: false
+      - name: Write ${{ inputs.dotenv-path }}
+        if: ${{ inputs.dotenv-path != '' }}
+        env:
+          DOTENV_PATH: ${{ inputs.dotenv-path }}
+          DOTENV: ${{ inputs.dotenv }}
+        run: |
+          printf '%s\n' "$DOTENV" > "$DOTENV_PATH"
+          cat "$DOTENV_PATH"
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Login to ghcr.io
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          # Every DeepLynx Dockerfile builds from the repository root
+          context: .
+          file: ${{ inputs.file }}
+          build-args: ${{ inputs.build-args }}
+          platforms: linux/${{ matrix.platform }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ inputs.sha }}
+            org.opencontainers.image.version=${{ inputs.tag }}
+          # The tag is applied in the merge job, once both platforms exist
+          outputs: type=image,name=${{ inputs.image }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ inputs.name }}-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.name }}-${{ matrix.platform }}
+      - name: Export digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+      - name: Upload digest
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: digest-${{ inputs.name }}-${{ matrix.platform }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: "merge"
+    needs: build
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digest-${{ inputs.name }}-*
+          merge-multiple: true
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Login to ghcr.io
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create multi-arch tag
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ${{ inputs.image }}
+          TAG: ${{ inputs.tag }}
+          SOURCE: ${{ github.server_url }}/${{ github.repository }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          # The files are named by digest, without the sha256: prefix
+          digests=(*)
+          if [ "${#digests[@]}" -ne 2 ]; then
+            echo "::error::Expected 2 digests (amd64, arm64), found ${#digests[@]}"
+            exit 1
+          fi
+          # The index annotation is what links the ghcr.io package to this repo
+          docker buildx imagetools create \
+            --tag "$IMAGE:$TAG" \
+            --annotation "index:org.opencontainers.image.source=$SOURCE" \
+            --annotation "index:org.opencontainers.image.revision=$SHA" \
+            "${digests[@]/#/$IMAGE@sha256:}"
+      - name: Inspect
+        env:
+          REF: ${{ inputs.image }}:${{ inputs.tag }}
+        run: docker buildx imagetools inspect "$REF"

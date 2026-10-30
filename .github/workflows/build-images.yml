@@ -1,0 +1,197 @@
+name: build-images
+run-name: "Build images ${{ inputs.tag }} from ${{ inputs.ref }}"
+
+# Builds the DeepLynx server, ui, mcp and docs images from a commit of this
+# repository and pushes them to ghcr.io/<owner>/deeplynx/deeplynx-<image>:<tag>.
+#
+#   gh workflow run build-images.yml --ref build-images -f ref=0.8.0 -f tag=0.8.0
+#
+# The source is idaholab/DeepLynx by default, which has the release tags; the
+# images are published under the repository running this workflow.
+#
+# This lives on the orphan build-images branch, away from the mirrored main.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: DeepLynx commit, tag or branch to build
+        required: true
+        type: string
+      repository:
+        description: Repository to build from; the default has the release tags
+        required: false
+        type: string
+        default: idaholab/DeepLynx
+      tag:
+        description: Image tag, such as the DeepLynx release (0.8.0)
+        required: true
+        type: string
+      api-url:
+        description: >-
+          UI build setting: the server's /api URL as the browser sees it.
+          Next.js bakes NEXT_PUBLIC_* values into the bundle
+        required: false
+        type: string
+        default: http://localhost:5000/api
+      docs-url:
+        description: UI build setting, the docs URL as the browser sees it
+        required: false
+        type: string
+        default: http://localhost:3001/docs
+      ui-url:
+        description: Docs build setting, the UI URL as the browser sees it
+        required: false
+        type: string
+        default: http://localhost:3000
+  # Only so GitHub registers the workflow from this branch, which isn't the
+  # default one, and allows dispatching it with --ref build-images. Builds nothing
+  push:
+    branches: [build-images]
+    paths: [.github/workflows/build-images.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  meta:
+    name: "meta"
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-slim
+    outputs:
+      sha: ${{ steps.meta.outputs.sha }}
+      prefix: ${{ steps.meta.outputs.prefix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.ref }}
+      - name: Resolve commit
+        id: meta
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          # A docker tag: [A-Za-z0-9_][A-Za-z0-9_.-]{0,127}
+          if ! [[ "$TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "::error::Not a valid image tag: $TAG"
+            exit 1
+          fi
+          # ghcr.io/<owner>/deeplynx; ghcr.io requires lowercase names
+          {
+            echo "sha=$(git rev-parse HEAD)"
+            echo "prefix=ghcr.io/${GITHUB_REPOSITORY,,}"
+          } >> "$GITHUB_OUTPUT"
+
+  server:
+    name: "server ${{ inputs.tag }}"
+    needs: meta
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-image.yml
+    with:
+      name: server
+      image: ${{ needs.meta.outputs.prefix }}/deeplynx-server
+      tag: ${{ inputs.tag }}
+      repository: ${{ inputs.repository }}
+      sha: ${{ needs.meta.outputs.sha }}
+      file: Dockerfiles/server/Dockerfile.public
+
+  ui:
+    name: "ui ${{ inputs.tag }}"
+    needs: meta
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-image.yml
+    with:
+      name: ui
+      image: ${{ needs.meta.outputs.prefix }}/deeplynx-ui
+      tag: ${{ inputs.tag }}
+      repository: ${{ inputs.repository }}
+      sha: ${{ needs.meta.outputs.sha }}
+      file: Dockerfiles/ui/Dockerfile.public
+      # Dockerfile.public only takes the API URL and version as build args, so
+      # the rest of the NEXT_PUBLIC_* values go in .env.production, which
+      # next build reads. Without auth disabled here, the UI requires Okta.
+      # This is the local, no-login UI that matches docker-compose.yaml; the
+      # server-side values (BACKEND_BASE_URL, NEXTAUTH_SECRET) are set at runtime
+      build-args: |
+        NEXT_PUBLIC_API_URL=${{ inputs.api-url }}
+        NEXT_PUBLIC_API_VERSION=v2
+        BACKEND_BASE_URL=http://server:5000/api
+      dotenv-path: deeplynx.UI/.env.production
+      dotenv: |
+        NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=true
+        NEXT_PUBLIC_DOCS_PATH=${{ inputs.docs-url }}
+
+  mcp:
+    name: "mcp ${{ inputs.tag }}"
+    needs: meta
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-image.yml
+    with:
+      name: mcp
+      image: ${{ needs.meta.outputs.prefix }}/deeplynx-mcp
+      tag: ${{ inputs.tag }}
+      repository: ${{ inputs.repository }}
+      sha: ${{ needs.meta.outputs.sha }}
+      file: Dockerfiles/mcp/Dockerfile.public
+
+  docs:
+    name: "docs ${{ inputs.tag }}"
+    needs: meta
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-image.yml
+    with:
+      name: docs
+      image: ${{ needs.meta.outputs.prefix }}/deeplynx-docs
+      tag: ${{ inputs.tag }}
+      repository: ${{ inputs.repository }}
+      sha: ${{ needs.meta.outputs.sha }}
+      file: Dockerfiles/docs/Dockerfile.public
+      build-args: HOSTED_LINK=${{ inputs.ui-url }}
+
+  summary:
+    name: "summary"
+    if: ${{ always() && needs.meta.result == 'success' }}
+    needs: [meta, server, ui, mcp, docs]
+    runs-on: ubuntu-slim
+    steps:
+      - name: Write summary
+        env:
+          PREFIX: ${{ needs.meta.outputs.prefix }}
+          TAG: ${{ inputs.tag }}
+          SHA: ${{ needs.meta.outputs.sha }}
+          RESULTS: >-
+            server=${{ needs.server.result }}
+            ui=${{ needs.ui.result }}
+            mcp=${{ needs.mcp.result }}
+            docs=${{ needs.docs.result }}
+        run: |
+          {
+            echo "## DeepLynx images \`$TAG\` from \`${SHA:0:7}\`"
+            echo
+            echo "| Image | Reference | Status |"
+            echo "|---|---|---|"
+            for result in $RESULTS; do
+              name=${result%%=*}
+              case "${result#*=}" in
+                success) status="✅ published" ;;
+                skipped) status="⏭️ skipped" ;;
+                cancelled) status="⚪ cancelled" ;;
+                *) status="❌ ${result#*=}" ;;
+              esac
+              echo "| $name | \`$PREFIX/deeplynx-$name:$TAG\` | $status |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
